@@ -1,0 +1,93 @@
+paths:
+  emdat_raw:       "data/raw/Disaster data.xlsx"
+  arrivals_raw:    "data/raw/tourist_arrivals.csv"
+  processed_dir:   "data/processed/"
+  outputs_dir:     "outputs/"
+  figures_dir:     "outputs/figures/"
+  results_dir:     "outputs/results/"
+
+experiment:
+  seed: 42
+  recovery_threshold: 0.90
+  max_recovery_months: 12
+  baseline_window_years: 3
+  train_cutoff_year: 2018
+  exp_b_n_total: 86
+
+external_shocks:
+  # Year ranges where a non-natural external shock was active
+  easter_attacks: [2019, 2019]
+  covid: [2020, 2022]
+  economic_crisis: [2022, 2022]
+
+hazard_taxonomy:
+  physical_types:
+    - Flood
+    - Storm
+    - Earthquake
+    - Landslide
+    - Drought
+    - "Mass movement (wet)"
+    - "Extreme temperature"
+    - Wildfire
+  compound_cluster_days: 30
+
+dtii:
+  # District Tourism Importance Index: share of national registered accommodation rooms
+  # Source: SLTDA Annual Statistical Reports (normalized to sum = 1.0)
+  Colombo: 0.195
+  Galle: 0.138
+  Kandy: 0.092
+  Kalutara: 0.087
+  Gampaha: 0.062
+  Hambantota: 0.058
+  Nuwara Eliya: 0.055
+  Matara: 0.047
+  Ampara: 0.038
+  Trincomalee: 0.036
+  Batticaloa: 0.025
+  Anuradhapura: 0.024
+  Polonnaruwa: 0.018
+  Kurunegala: 0.017
+  Ratnapura: 0.016
+  Puttalam: 0.015
+  Badulla: 0.014
+  Monaragala: 0.013
+  Kegalle: 0.012
+  Matale: 0.010
+  Jaffna: 0.009
+  Vavuniya: 0.005
+  Mannar: 0.004
+  Mullaitivu: 0.003
+  Kilinochchi: 0.002
+
+sensitivity_analysis:
+  thresholds: [0.80, 0.90, 1.00]
+  baseline_windows: [3, 6, 12]
+
+hyperparameter_grids:
+  xgboost:
+    n_estimators: [50, 100, 150, 200]
+    max_depth: [2, 3, 4]
+    learning_rate: [0.01, 0.03, 0.05, 0.1]
+    subsample: [0.7, 0.8, 0.9]
+    colsample_bytree: [0.7, 0.8, 0.9]
+    reg_alpha: [0.01, 0.1, 1.0]
+    reg_lambda: [0.5, 1.0, 2.0]
+
+  random_forest:
+    n_estimators: [50, 100, 200]
+    max_depth: [3, 5, 7, null]
+    min_samples_leaf: [1, 2, 4]
+    max_features: [0.5, 0.7, 1.0]
+
+  svr:
+    C: [0.1, 1.0, 10.0, 100.0]
+    epsilon: [0.01, 0.1, 0.5]
+    kernel: [rbf, linear]
+
+  ridge:
+    alpha: [0.01, 0.1, 1.0, 10.0, 100.0]
+
+conformal_prediction:
+  alpha: 0.05

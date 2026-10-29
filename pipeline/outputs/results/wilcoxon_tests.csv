@@ -1,0 +1,6 @@
+test,model_a,model_b,statistic,p_value,significant_at_0.05
+Wilcoxon signed-rank,XGBoost,RandomForest,381.0,0.033744,True
+Wilcoxon signed-rank,XGBoost,Ridge,413.0,0.163624,False
+Wilcoxon signed-rank,XGBoost,SVR,541.0,0.807704,False
+Wilcoxon signed-rank,XGBoost,NaiveMean,255.0,0.000128,True
+Wilcoxon signed-rank,XGBoost,NaiveMedian,341.0,0.668784,False

@@ -1,0 +1,72 @@
+{
+  "RQ1": {
+    "question": "What is the distribution of tourism recovery duration after natural disasters in Sri Lanka (2000-2025)?",
+    "answer": {
+      "n_events": 65,
+      "median_recovery_months": 0.0,
+      "mean_recovery_months": 3.446,
+      "right_censored_n": 13,
+      "censoring_rate_pct": 20.0,
+      "note": "Right-censoring at 12 months; events where recovery not achieved within observation window treated as censored, not as 12-month recoveries."
+    }
+  },
+  "RQ2": {
+    "question": "Which disaster and economic features most strongly predict recovery duration?",
+    "answer": {
+      "method": "TreeSHAP (Experiment B, XGBoost)",
+      "top_3_features": [
+        {
+          "Feature": "global_tourism_idx",
+          "Mean_Abs_SHAP": 1.256256341934204
+        },
+        {
+          "Feature": "Economic_Condition_Index",
+          "Mean_Abs_SHAP": 0.7736117243766785
+        },
+        {
+          "Feature": "gdp_growth",
+          "Mean_Abs_SHAP": 0.45334580540657043
+        }
+      ],
+      "note": "DSI and TWDI capture hazard severity; external_shock_flag captures systematic macro-collapses (COVID, Easter attacks, 2022 crisis) outside physical disaster mechanism."
+    }
+  },
+  "RQ3": {
+    "question": "Can ML models predict recovery duration better than naive historical baselines?",
+    "answer": {
+      "experiment_A_best_model": "XGBoost",
+      "experiment_A_best_MAE": 1.8269,
+      "experiment_B_best_model": "Ridge",
+      "experiment_B_best_MAE": 2.5101,
+      "wilcoxon_vs_naive": {
+        "NaiveMean": {
+          "p_value": 0.000128,
+          "significant": true
+        },
+        "NaiveMedian": {
+          "p_value": 0.668784,
+          "significant": false
+        }
+      },
+      "note": "Significance tested with Wilcoxon signed-rank (non-parametric). 95% bootstrap CIs reported for all point estimates."
+    }
+  },
+  "RQ4": {
+    "question": "How robust are predictions across varying recovery thresholds and baseline windows?",
+    "answer": {
+      "thresholds_tested": [
+        0.8,
+        0.9,
+        1.0
+      ],
+      "baseline_windows_tested": [
+        3,
+        6,
+        12
+      ],
+      "main_threshold": 0.9,
+      "main_baseline_window": 3,
+      "note": "See sensitivity_analysis.csv for full grid results. Main threshold (90%) chosen per UNWTO recovery benchmark."
+    }
+  }
+}
