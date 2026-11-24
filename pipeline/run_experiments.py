@@ -76,6 +76,8 @@ def main():
     _p("\n[2/6] Computing seasonally adjusted recovery targets...")
     df_with_targets = build_recovery_targets(emdat, arrivals, cfg)
     df_with_targets = df_with_targets.dropna(subset=["recovery_months"])
+    # Enforce chronological order so NaivePrevious uses temporal predecessor
+    df_with_targets = df_with_targets.sort_values("start_date").reset_index(drop=True)
 
     dist = target_distribution_summary(df_with_targets["recovery_months"].values)
     _p(f"      N events: {dist['n_total']}")
@@ -138,11 +140,21 @@ def main():
     results_B_eval = {k: {"y_true": v["y_true"], "y_pred": v["y_pred"]} for k, v in results_B.items()}
     results_B_eval.update(naive_B)
 
+    # NOTE: For Exp B we report empirical test-set coverage only.
+    # Computing q_hat from the same test residuals used to measure coverage is circular
+    # (not a valid conformal prediction guarantee). A proper split-conformal PI would
+    # require a separate calibration partition. See ISS-C02 in repository_audit_report.md.
     xgb_res_B = results_B_eval["XGBoost"]
-    pi_B = conformal_pi_from_loocv(
-        xgb_res_B["y_true"], xgb_res_B["y_pred"],
-        alpha=cfg["conformal_prediction"]["alpha"]
-    )
+    y_true_B = np.array(xgb_res_B["y_true"])
+    y_pred_B = np.array(xgb_res_B["y_pred"])
+    alpha_B = cfg["conformal_prediction"]["alpha"]
+    residuals_B = np.abs(y_true_B - y_pred_B)
+    # q_hat from TRAINING residuals would be needed for a valid PI; here we report
+    # the empirical coverage of the test set for transparency only.
+    pi_B = {
+        "empirical_test_coverage": float(np.mean(residuals_B <= np.quantile(residuals_B, 1 - alpha_B))),
+        "note": "Empirical test-set coverage only — not a conformal prediction guarantee (ISS-C02).",
+    }
 
     summary_B = summarize_experiment(results_B_eval, "ExpB_Chronological")
     _p("\n      --- Experiment B Results ---")
@@ -169,8 +181,8 @@ def main():
     tests_df.to_csv(results_dir / "wilcoxon_tests.csv", index=False)
 
     pi_summary = pd.DataFrame([
-        {"Experiment": "A (LOOCV)", **pi_A},
-        {"Experiment": "B (Chronological)", **pi_B},
+        {"Experiment": "A (LOOCV)", "type": "conformal_PI_valid", **pi_A},
+        {"Experiment": "B (Chronological)", "type": "empirical_test_coverage_only", **pi_B},
     ])
     pi_summary.to_csv(results_dir / "conformal_prediction_intervals.csv", index=False)
 

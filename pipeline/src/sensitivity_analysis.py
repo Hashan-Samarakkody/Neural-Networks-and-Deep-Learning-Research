@@ -34,8 +34,11 @@ def compute_recovery_months_threshold(
 ) -> tuple[int, bool]:
     """
     Compute recovery duration for one event under given threshold + baseline window.
-    arrivals_idx: pre-built dict from _build_arrivals_index().
-    Returns (recovery_months, is_right_censored).
+    Harmonized with baseline_counterfactual.py logic:
+      - Iterates backwards year-by-year to find baseline_window non-crisis years
+      - Only includes positive arrival values (val > 0)
+      - Falls back to overall monthly mean when no valid years found
+      - Returns (recovery_months, is_right_censored)
     """
     if crisis_years is None:
         crisis_years = {2019, 2020, 2021, 2022}
@@ -43,24 +46,30 @@ def compute_recovery_months_threshold(
     event_year = int(event_row.get("start_year", event_row.get("Start Year", 0)))
     event_month = int(event_row.get("start_month", event_row.get("Start Month", 1)))
 
-    ref_years = sorted(
-        [y for y in all_years if y < event_year and y not in crisis_years],
-        reverse=True,
-    )[:baseline_window]
+    # Match baseline_counterfactual.py: iterate backwards, skip crisis years,
+    # require val > 0, collect exactly baseline_window years
+    min_year = min(all_years) if all_years else 2000
+    valid_vals = []
+    y = event_year - 1
+    while len(valid_vals) < baseline_window:
+        if y < min_year:
+            break
+        if y not in crisis_years:
+            val = arrivals_idx.get((y, event_month))
+            if val is not None and val > 0:
+                valid_vals.append(val)
+        y -= 1
 
-    if not ref_years:
-        return np.nan, False
+    if not valid_vals:
+        # Fallback: overall monthly mean (matches baseline_counterfactual.py)
+        all_month_vals = [v for (yr, mo), v in arrivals_idx.items() if mo == event_month and v > 0]
+        if not all_month_vals:
+            return np.nan, False
+        baseline_mean = float(np.mean(all_month_vals))
+    else:
+        baseline_mean = float(np.mean(valid_vals))
 
-    baseline_vals = [
-        arrivals_idx[(ry, event_month)]
-        for ry in ref_years
-        if (ry, event_month) in arrivals_idx
-    ]
-
-    if not baseline_vals:
-        return np.nan, False
-
-    target = recovery_threshold * np.mean(baseline_vals)
+    target = recovery_threshold * baseline_mean
 
     for t in range(1, max_months + 1):
         total_month = event_month + t - 1
@@ -68,7 +77,9 @@ def compute_recovery_months_threshold(
         check_month = total_month % 12 + 1
         val = arrivals_idx.get((check_year, check_month))
         if val is not None and val >= target:
-            return t, False
+            if t == 1:
+                return 0, False
+            return t - 1, False
 
     return max_months, True
 

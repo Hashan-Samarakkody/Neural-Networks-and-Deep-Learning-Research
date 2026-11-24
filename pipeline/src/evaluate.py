@@ -31,7 +31,7 @@ def compute_metrics(y_true: list | np.ndarray, y_pred: list | np.ndarray) -> dic
 def compute_metrics_with_ci(
     y_true: list | np.ndarray,
     y_pred: list | np.ndarray,
-    n_bootstrap: int = 200,
+    n_bootstrap: int = 1000,
     seed: int = 42,
 ) -> dict:
     """

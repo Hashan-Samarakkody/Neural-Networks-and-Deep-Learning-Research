@@ -37,7 +37,7 @@ _N_JOBS = min(4, max(1, (os.cpu_count() or 4) // 2))
 MODEL_REGISTRY = {
     "Ridge": {
         "class": Ridge,
-        "default_params": {"random_state": None},
+        "default_params": {},
         "grid_key": "ridge",
         "needs_scaling": True,
     },
