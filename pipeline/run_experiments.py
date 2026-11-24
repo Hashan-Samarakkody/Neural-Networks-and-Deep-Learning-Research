@@ -31,6 +31,7 @@ from baseline_counterfactual import build_recovery_targets
 from feature_engineering import build_feature_matrix, FEATURE_COLS
 from validation import chronological_split
 from train import run_loocv, run_chronological_split, naive_baselines_loocv, naive_baselines_split
+from two_stage_model import run_two_stage_loocv, run_two_stage_split, stage1_loocv_accuracy
 from evaluate import (
     summarize_experiment, conformal_pi_from_loocv, wilcoxon_comparison,
     target_distribution_summary, performance_by_hazard_type,
@@ -116,6 +117,14 @@ def main():
     naive_A = naive_baselines_loocv(y_A)
     results_A.update(naive_A)
 
+    _p("      Running two-stage zero-inflation model (Exp A LOOCV)...")
+    ts_A = run_two_stage_loocv(X_A, y_A)
+    results_A.update(ts_A)
+    s1_acc = stage1_loocv_accuracy(X_A, y_A)
+    _p(f"      Stage-1 classifier accuracy: {s1_acc['stage1_accuracy']} | "
+       f"F1(non-zero): {s1_acc['stage1_f1_nonzero']} "
+       f"(N_zero={s1_acc['stage1_n_zero']}, N_nonzero={s1_acc['stage1_n_nonzero']})")
+
     xgb_res_A = results_A["XGBoost"]
     pi_A = conformal_pi_from_loocv(
         xgb_res_A["y_true"], xgb_res_A["y_pred"],
@@ -139,6 +148,8 @@ def main():
     naive_B = naive_baselines_split(y_B[train_idx], y_B[test_idx])
     results_B_eval = {k: {"y_true": v["y_true"], "y_pred": v["y_pred"]} for k, v in results_B.items()}
     results_B_eval.update(naive_B)
+    ts_B = run_two_stage_split(X_B, y_B, train_idx, test_idx)
+    results_B_eval.update(ts_B)
 
     # NOTE: For Exp B we report empirical test-set coverage only.
     # Computing q_hat from the same test residuals used to measure coverage is circular
@@ -160,10 +171,10 @@ def main():
     _p("\n      --- Experiment B Results ---")
     _p(summary_B[["Model", "MAE", "RMSE", "R2", "PI_half_width", "PI_empirical_coverage"]].to_string(index=False))
 
-    _p("\n[6/6] Wilcoxon signed-rank tests (XGBoost vs others)...")
+    _p("\n[6/6] Wilcoxon signed-rank tests (XGBoost vs others, TwoStage vs XGBoost)...")
     y_true_A = np.array(results_A["XGBoost"]["y_true"])
     tests = []
-    for opponent in ["RandomForest", "Ridge", "SVR", "NaiveMean", "NaiveMedian"]:
+    for opponent in ["RandomForest", "Ridge", "SVR", "NaiveMean", "NaiveMedian", "TwoStage"]:
         if opponent in results_A:
             w = wilcoxon_comparison(
                 y_true_A,
@@ -179,6 +190,8 @@ def main():
     all_results = pd.concat([summary_A, summary_B], ignore_index=True)
     all_results.to_csv(results_dir / "experiment_results.csv", index=False)
     tests_df.to_csv(results_dir / "wilcoxon_tests.csv", index=False)
+    with open(results_dir / "two_stage_stage1_accuracy.json", "w") as f:
+        json.dump(s1_acc, f, indent=2)
 
     pi_summary = pd.DataFrame([
         {"Experiment": "A (LOOCV)", "type": "conformal_PI_valid", **pi_A},
