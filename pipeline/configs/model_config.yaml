@@ -12,7 +12,13 @@ experiment:
   max_recovery_months: 12
   baseline_window_years: 3
   train_cutoff_year: 2018
-  exp_b_n_total: 86
+
+# R-03: drop events with fewer than min_reference_years non-crisis prior years
+baseline:
+  min_reference_years: 2
+
+# R-07: exclude damage_usd_000 from DSI (74% missing; set true for 4-component sensitivity)
+dsi_include_damage: false
 
 external_shocks:
   # Year ranges where a non-natural external shock was active

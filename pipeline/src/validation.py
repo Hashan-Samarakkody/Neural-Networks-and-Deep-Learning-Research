@@ -1,11 +1,13 @@
 """
 Validation engines for the two experimental designs.
 
-Experiment A (pure natural hazards, N=67):
-    Leave-One-Out Cross-Validation (LOOCV) — preserves maximum sample size.
+Experiment A (pure natural hazards):
+    LOOCV — preserves maximum sample size.
+    buffered_loocv_split — drops events within ±buffer_months of test onset (R-08).
+    leave_one_year_out_split — hold out all events from one calendar year.
 
-Experiment B (all events including compound shocks, N=86):
-    Strict chronological split — train on 2000-2018, test on 2019-2025.
+Experiment B (all events including compound shocks):
+    Strict chronological split — train <= 2018, test >= 2019.
     No random shuffling. Eliminates temporal data leakage.
 """
 
@@ -52,7 +54,65 @@ def chronological_split(
 def inner_cv_folds(X_train: np.ndarray, n_splits: int = 5, seed: int = 42):
     """
     Inner k-fold splits for nested hyperparameter search.
-    Used inside GridSearchCV to prevent test-set leakage.
+    R-08: shuffle=False — preserves temporal order inside inner folds.
     """
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    kf = KFold(n_splits=n_splits, shuffle=False)
     return list(kf.split(X_train))
+
+
+def buffered_loocv_split(
+    df: pd.DataFrame,
+    buffer_months: int = 12,
+) -> list:
+    """
+    R-08: Buffered LOOCV — for each test event, drop from training any event
+    whose onset is within ±buffer_months of the test onset.
+
+    Yields (train_idx, test_idx) where test_idx is a 1-element array.
+    Requires df["start_date"] (Timestamp).
+    """
+    if "start_date" not in df.columns:
+        raise ValueError("buffered_loocv_split requires df['start_date'].")
+
+    onsets = pd.to_datetime(df["start_date"].values)
+    n = len(df)
+    buffer = pd.DateOffset(months=buffer_months)
+    splits = []
+
+    for i in range(n):
+        t = onsets[i]
+        train_mask = np.array([
+            abs((onsets[j] - t).days) > buffer_months * 30
+            for j in range(n)
+            if j != i
+        ])
+        all_others = np.array([j for j in range(n) if j != i])
+        train_idx = all_others[train_mask]
+        test_idx = np.array([i])
+        if len(train_idx) > 0:
+            splits.append((train_idx, test_idx))
+
+    return splits
+
+
+def leave_one_year_out_split(
+    df: pd.DataFrame,
+) -> list:
+    """
+    R-08: Leave-one-year-out — hold out all events from one calendar year,
+    train on all other years.
+
+    Yields (train_idx, test_idx) for each unique year.
+    Requires df["start_year"].
+    """
+    years = df["start_year"].values
+    unique_years = sorted(set(years))
+    splits = []
+
+    for yr in unique_years:
+        test_idx = np.where(years == yr)[0]
+        train_idx = np.where(years != yr)[0]
+        if len(test_idx) > 0 and len(train_idx) > 0:
+            splits.append((train_idx, test_idx))
+
+    return splits

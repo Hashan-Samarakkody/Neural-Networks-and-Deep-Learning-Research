@@ -62,8 +62,8 @@ def compute_baseline(
             y -= 1
 
         if not valid_years:
-            all_month = arrivals[arrivals["month"] == target_month]["tourist_arrivals"]
-            return float(all_month.mean()) if len(all_month) > 0 else 0.0
+            # R-03: no all-years fallback; return 0 so offset is skipped
+            return 0.0
 
         return float(np.mean(valid_years))
 
@@ -128,6 +128,41 @@ def compute_recovery_months(
     return max_months, baselines, True
 
 
+def _count_reference_years(
+    arrivals: pd.DataFrame,
+    disaster_year: int,
+    disaster_month: int,
+    K: int,
+    crisis_years: set,
+    max_months: int = 12,
+) -> int:
+    """Return the minimum number of non-crisis reference years available across all offsets."""
+    arr_idx = arrivals.set_index(["year", "month"])["tourist_arrivals"]
+    min_count = K  # start at K; will be reduced if any offset has fewer
+
+    for offset in range(1, max_months + 1):
+        month_seq = disaster_month + offset - 1
+        target_month = (month_seq % 12) + 1
+        target_year = disaster_year + (month_seq // 12)
+
+        count = 0
+        y = target_year - 1
+        while count < K:
+            if y < arrivals["year"].min():
+                break
+            if y not in crisis_years:
+                try:
+                    val = arr_idx.loc[(y, target_month)]
+                    if pd.notna(val) and val > 0:
+                        count += 1
+                except KeyError:
+                    pass
+            y -= 1
+        min_count = min(min_count, count)
+
+    return min_count
+
+
 def build_recovery_targets(
     emdat: pd.DataFrame,
     arrivals: pd.DataFrame,
@@ -137,11 +172,16 @@ def build_recovery_targets(
     Compute T_rec for every disaster event in emdat.
 
     Returns emdat with added columns:
-        recovery_months, pre_disaster_baseline, is_right_censored
+        recovery_months, pre_disaster_baseline, is_right_censored,
+        n_reference_years_min, baseline_insufficient
+    baseline_insufficient=True when fewer than baseline.min_reference_years
+    non-crisis reference years exist for any post-disaster offset; those events
+    get recovery_months=NaN and are dropped before modelling (R-03).
     """
     K = cfg["experiment"]["baseline_window_years"]
     threshold = cfg["experiment"]["recovery_threshold"]
     max_months = cfg["experiment"]["max_recovery_months"]
+    min_ref = cfg.get("baseline", {}).get("min_reference_years", 2)
 
     shock_cfg = cfg["external_shocks"]
     crisis_years = set()
@@ -153,17 +193,25 @@ def build_recovery_targets(
         year = int(row["start_year"])
         month = int(row["start_month"])
 
-        t_rec, baselines, censored = compute_recovery_months(
-            arrivals, year, month, K=K,
-            threshold=threshold, max_months=max_months,
-            crisis_years=crisis_years,
-        )
+        n_ref = _count_reference_years(arrivals, year, month, K, crisis_years, max_months)
+        insufficient = n_ref < min_ref
+
+        if insufficient:
+            t_rec, baselines, censored = np.nan, {}, False
+        else:
+            t_rec, baselines, censored = compute_recovery_months(
+                arrivals, year, month, K=K,
+                threshold=threshold, max_months=max_months,
+                crisis_years=crisis_years,
+            )
 
         records.append({
             **row.to_dict(),
             "recovery_months": t_rec,
             "pre_disaster_baseline": baselines.get(0, np.nan),
             "is_right_censored": censored,
+            "n_reference_years_min": n_ref,
+            "baseline_insufficient": insufficient,
         })
 
     return pd.DataFrame(records)

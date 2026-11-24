@@ -10,8 +10,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from baseline_counterfactual import compute_recovery_months
-from feature_engineering import compute_dsi, compute_twdi, compute_dtii, add_seasonality
+from baseline_counterfactual import compute_recovery_months, build_recovery_targets
+from feature_engineering import compute_dsi, compute_dtii, add_seasonality
+from preprocess import FeatureBuilder
 from evaluate import conformal_prediction_interval
 from validation import chronological_split
 from two_stage_model import _fit, _predict, run_two_stage_loocv
@@ -89,17 +90,45 @@ class TestRecoveryMonths:
         assert t == 12
         assert censored is True
 
-    def test_crisis_year_exclusion(self):
-        """If the only valid prior years are crisis years, falls back to overall mean."""
+    def test_crisis_year_exclusion_no_fallback(self):
+        """R-03: no all-years fallback. All prior years are crisis years → baseline=0, skip offset."""
         arr = _make_arrivals(start=2010, end=2012)
-        # 2009 and 2010 and 2011 are all crisis years → no reference years
         t, baselines, _ = compute_recovery_months(
             arr, disaster_year=2012, disaster_month=6,
             K=3, threshold=0.90, max_months=12,
             crisis_years={2009, 2010, 2011},
         )
-        # Fallback should still produce a numeric baseline (overall mean)
+        # R-03: returns 0.0 when no valid reference years (no fallback to all-years mean)
+        assert baselines[1] == pytest.approx(0.0)
+
+    def test_december_onset_month_rollover(self):
+        """Disaster in December: month+1 wraps to January of next year. T_rec computed correctly."""
+        arr = _make_arrivals(start=2008, end=2014)
+        # Suppress January and February 2013 (months 1-2 after December 2012 disaster)
+        arr_mod = _make_arrivals(
+            override={(2013, 1): 50_000, (2013, 2): 50_000},
+            start=2008, end=2014,
+        )
+        t, baselines, _ = compute_recovery_months(
+            arr_mod, disaster_year=2012, disaster_month=12,
+            K=3, threshold=0.90, max_months=12, crisis_years=set(),
+        )
+        # offset 1 = Jan 2013 (50k < 90k), offset 2 = Feb 2013 (50k < 90k), offset 3 = Mar 2013 (100k >= 90k)
+        assert t == 2
+        # baselines for January use prior years' January values (non-zero)
         assert baselines[1] > 0
+
+    def test_no_future_years_in_baseline(self):
+        """R-03: baseline must only use years strictly before the disaster year."""
+        # Arrivals only: 2010-2014. Disaster in 2010 → prior year 2009 missing.
+        arr = _make_arrivals(start=2010, end=2014)
+        t, baselines, _ = compute_recovery_months(
+            arr, disaster_year=2010, disaster_month=6,
+            K=3, threshold=0.90, max_months=12, crisis_years=set(),
+        )
+        # Only years < 2010 count; none exist → baseline 0 for all offsets
+        for offset in range(1, 13):
+            assert baselines.get(offset, 0.0) == pytest.approx(0.0)
 
 
 # ── DSI / TWDI ──────────────────────────────────────────────────────────────
@@ -117,20 +146,56 @@ class TestFeatureEngineering:
         df_out, _ = compute_dsi(df)
         assert df_out["DSI"].iloc[0] == pytest.approx(0.0)
 
-    def test_twdi_is_product(self):
-        """TWDI = DSI * DTII exactly."""
-        df = pd.DataFrame({
-            "total_affected": [1000.0],
-            "deaths": [10.0],
-            "damage_usd_000": [500.0],
-            "duration_days": [5.0],
-            "location": ["Colombo"],
+    def _make_fb_df(self, n=5, seed=0):
+        """Minimal DataFrame suitable for FeatureBuilder."""
+        rng = np.random.default_rng(seed)
+        return pd.DataFrame({
+            "total_affected": rng.uniform(0, 10000, n),
+            "deaths": rng.uniform(0, 100, n),
+            "duration_days": rng.uniform(1, 30, n),
+            "start_year": [2010] * n,
+            "start_month": rng.integers(1, 13, n),
+            "location": ["Colombo"] * n,
         })
-        dtii_cfg = {"Colombo": 0.195}
-        df, _ = compute_dsi(df)
-        df = compute_dtii(df, dtii_cfg)
-        df = compute_twdi(df)
-        assert df["TWDI"].iloc[0] == pytest.approx(df["DSI"].iloc[0] * 0.195)
+
+    def _minimal_cfg(self):
+        return {
+            "dtii": {"Colombo": 0.195},
+            "external_shocks": {},
+            "dsi_include_damage": False,
+        }
+
+    def test_twdi_is_dsi_pos_times_dtii(self):
+        """R-02: TWDI = DSI_pos × DTII (not DSI × DTII). DSI_pos ∈ [0,1]."""
+        df = self._make_fb_df(n=10)
+        cfg = self._minimal_cfg()
+        fb = FeatureBuilder(cfg)
+        out = fb.fit_transform(df)
+        np.testing.assert_allclose(
+            out["TWDI"].values,
+            (out["DSI_pos"] * out["DTII"]).values,
+            rtol=1e-9,
+        )
+
+    def test_twdi_non_negative(self):
+        """R-02: TWDI >= 0 always, even when DSI is negative."""
+        df = self._make_fb_df(n=20, seed=99)
+        cfg = self._minimal_cfg()
+        fb = FeatureBuilder(cfg)
+        out = fb.fit_transform(df)
+        assert (out["TWDI"].values >= 0).all(), "TWDI must be non-negative"
+
+    def test_twdi_monotone_in_dtii(self):
+        """Higher DTII for identical severity → higher TWDI."""
+        base = self._make_fb_df(n=5)
+        cfg_low = {**self._minimal_cfg(), "dtii": {"Colombo": 0.10}}
+        cfg_high = {**self._minimal_cfg(), "dtii": {"Colombo": 0.40}}
+        fb_low = FeatureBuilder(cfg_low).fit(base)
+        fb_high = FeatureBuilder(cfg_high).fit(base)
+        out_low = fb_low.transform(base)
+        out_high = fb_high.transform(base)
+        # Every event: higher DTII → higher or equal TWDI
+        assert (out_high["TWDI"].values >= out_low["TWDI"].values - 1e-9).all()
 
     def test_seasonality_orthogonal(self):
         """sin² + cos² == 1 for every month."""
@@ -242,6 +307,115 @@ class TestTwoStageModel:
         result = run_two_stage_loocv(X, y)
         preds = np.array(result["TwoStage"]["y_pred"])
         assert np.all(preds >= 0) and np.all(preds <= 12)
+
+
+# ── fold-safe preprocessing ──────────────────────────────────────────────────
+
+class TestFoldSafeFeatures:
+    """R-01: FeatureBuilder must fit only on training rows."""
+
+    def _cfg(self):
+        return {
+            "dtii": {"Colombo": 0.195},
+            "external_shocks": {},
+            "dsi_include_damage": False,
+        }
+
+    def _df(self, n=30, seed=7):
+        rng = np.random.default_rng(seed)
+        return pd.DataFrame({
+            "total_affected": rng.uniform(0, 50000, n),
+            "deaths": rng.uniform(0, 500, n),
+            "duration_days": rng.uniform(1, 60, n),
+            "start_year": np.tile([2010, 2011, 2012], n // 3 + 1)[:n],
+            "start_month": rng.integers(1, 13, n),
+            "location": ["Colombo"] * n,
+        })
+
+    def test_scaler_ignores_test_rows(self):
+        """Scaler parameters must equal those from train-only fit, not full-dataset fit."""
+        df = self._df()
+        train_idx = np.arange(0, 20)
+        test_idx = np.arange(20, 30)
+
+        fb_fold = FeatureBuilder(self._cfg())
+        fb_fold.fit(df.iloc[train_idx])
+
+        fb_full = FeatureBuilder(self._cfg())
+        fb_full.fit(df)
+
+        # Scaler mean should differ between train-only and full-dataset fit
+        # (unless test rows are identical to train, which they're not by construction)
+        train_mean_fold = fb_fold._dsi_scaler.mean_
+        train_mean_full = fb_full._dsi_scaler.mean_
+        assert not np.allclose(train_mean_fold, train_mean_full), (
+            "Scaler fit on train only must differ from full-dataset fit"
+        )
+
+    def test_transform_before_fit_raises(self):
+        """transform() without prior fit() must raise."""
+        fb = FeatureBuilder(self._cfg())
+        with pytest.raises(RuntimeError):
+            fb.transform(self._df(n=5))
+
+    def test_dsi_min_from_train_only(self):
+        """DSI_pos range must reflect training distribution, not test distribution."""
+        df = self._df(n=40)
+        # Make last 10 rows extreme to widen the DSI range if test rows leaked in
+        df.loc[30:, "total_affected"] = 1_000_000
+        df.loc[30:, "deaths"] = 10_000
+
+        fb = FeatureBuilder(self._cfg())
+        fb.fit(df.iloc[:30])
+
+        # DSI_max should be from train; test rows' DSI may exceed it → clipped to 1
+        out_test = fb.transform(df.iloc[30:])
+        assert (out_test["DSI_pos"].values <= 1.0).all()
+        assert (out_test["DSI_pos"].values >= 0.0).all()
+
+
+# ── NaiveLastKnown ────────────────────────────────────────────────────────────
+
+class TestNaiveLastKnown:
+    """R-09: NaiveLastKnown uses most recent event whose 12-month window closed before current onset."""
+
+    def test_last_known_uses_closed_window(self):
+        """Event at t=0: prior event at t-13 months qualifies; event at t-6 months does not."""
+        from train import naive_baselines_loocv
+
+        onsets = pd.to_datetime([
+            "2010-01-01",   # event 0
+            "2010-07-01",   # event 1 (onset 6 months after event 0 — window still open)
+            "2011-08-01",   # event 2 (onset 19 months after event 0 — window closed)
+        ])
+        y = np.array([3.0, 5.0, 7.0])
+        df = pd.DataFrame({
+            "start_date": onsets,
+            "start_year": [2010, 2010, 2011],
+        })
+
+        result = naive_baselines_loocv(y, df=df)
+        lk = result["NaiveLastKnown"]
+
+        # For event 2 (index 2): event 0's window closed (Jan 2010 + 12m = Jan 2011 < Aug 2011).
+        # Event 1's window (Jul 2010 + 12m = Jul 2011) also closed before Aug 2011.
+        # Last known = event 1 (most recent closed), so pred = 5.0
+        assert lk["y_pred"][2] == pytest.approx(5.0)
+
+        # For event 1 (index 1): event 0's window (Jan 2010 + 12m = Jan 2011) is NOT closed
+        # before Jul 2010. No prior closed window → pred = NaN or 0
+        assert np.isnan(lk["y_pred"][1]) or lk["y_pred"][1] == pytest.approx(0.0)
+
+    def test_naive_previous_oracle_renamed(self):
+        """R-09: NaivePrevious renamed to NaivePrevious_Oracle in baselines output."""
+        from train import naive_baselines_loocv
+
+        y = np.array([2.0, 4.0, 6.0])
+        onsets = pd.to_datetime(["2010-01-01", "2011-01-01", "2012-01-01"])
+        df = pd.DataFrame({"start_date": onsets, "start_year": [2010, 2011, 2012]})
+        result = naive_baselines_loocv(y, df=df)
+        assert "NaivePrevious_Oracle" in result, "NaivePrevious must be renamed to NaivePrevious_Oracle"
+        assert "NaivePrevious" not in result, "Old name NaivePrevious must not exist"
 
 
 # ── integration ──────────────────────────────────────────────────────────────
