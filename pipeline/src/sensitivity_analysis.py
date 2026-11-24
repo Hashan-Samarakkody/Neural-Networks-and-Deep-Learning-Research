@@ -23,6 +23,45 @@ def _build_arrivals_index(arrivals: pd.DataFrame) -> dict:
     return idx
 
 
+def _seasonal_baselines(
+    event_year: int,
+    event_month: int,
+    arrivals_idx: dict,
+    min_year: int,
+    baseline_window: int,
+    crisis_years: set,
+    max_months: int = 12,
+) -> dict:
+    """
+    Compute per-offset seasonal baseline matching baseline_counterfactual.py exactly.
+    Returns {offset (1..max_months): baseline_arrivals}.
+    """
+    baselines = {}
+    for offset in range(1, max_months + 1):
+        month_seq = event_month + offset - 1
+        target_month = (month_seq % 12) + 1
+        target_year = event_year + (month_seq // 12)
+
+        valid_vals = []
+        y = target_year - 1
+        while len(valid_vals) < baseline_window:
+            if y < min_year:
+                break
+            if y not in crisis_years:
+                val = arrivals_idx.get((y, target_month))
+                if val is not None and val > 0:
+                    valid_vals.append(val)
+            y -= 1
+
+        if not valid_vals:
+            all_month_vals = [v for (yr, mo), v in arrivals_idx.items() if mo == target_month and v > 0]
+            baselines[offset] = float(np.mean(all_month_vals)) if all_month_vals else 0.0
+        else:
+            baselines[offset] = float(np.mean(valid_vals))
+
+    return baselines
+
+
 def compute_recovery_months_threshold(
     event_row: pd.Series,
     arrivals_idx: dict,
@@ -34,49 +73,32 @@ def compute_recovery_months_threshold(
 ) -> tuple[int, bool]:
     """
     Compute recovery duration for one event under given threshold + baseline window.
-    Harmonized with baseline_counterfactual.py logic:
-      - Iterates backwards year-by-year to find baseline_window non-crisis years
-      - Only includes positive arrival values (val > 0)
-      - Falls back to overall monthly mean when no valid years found
-      - Returns (recovery_months, is_right_censored)
+    Uses per-offset seasonal baseline — matches baseline_counterfactual.py exactly.
+    Returns (recovery_months, is_right_censored).
     """
     if crisis_years is None:
         crisis_years = {2019, 2020, 2021, 2022}
 
     event_year = int(event_row.get("start_year", event_row.get("Start Year", 0)))
     event_month = int(event_row.get("start_month", event_row.get("Start Month", 1)))
-
-    # Match baseline_counterfactual.py: iterate backwards, skip crisis years,
-    # require val > 0, collect exactly baseline_window years
     min_year = min(all_years) if all_years else 2000
-    valid_vals = []
-    y = event_year - 1
-    while len(valid_vals) < baseline_window:
-        if y < min_year:
-            break
-        if y not in crisis_years:
-            val = arrivals_idx.get((y, event_month))
-            if val is not None and val > 0:
-                valid_vals.append(val)
-        y -= 1
 
-    if not valid_vals:
-        # Fallback: overall monthly mean (matches baseline_counterfactual.py)
-        all_month_vals = [v for (yr, mo), v in arrivals_idx.items() if mo == event_month and v > 0]
-        if not all_month_vals:
-            return np.nan, False
-        baseline_mean = float(np.mean(all_month_vals))
-    else:
-        baseline_mean = float(np.mean(valid_vals))
-
-    target = recovery_threshold * baseline_mean
+    baselines = _seasonal_baselines(
+        event_year, event_month, arrivals_idx, min_year,
+        baseline_window, crisis_years, max_months,
+    )
 
     for t in range(1, max_months + 1):
-        total_month = event_month + t - 1
-        check_year = event_year + total_month // 12
-        check_month = total_month % 12 + 1
+        month_seq = event_month + t - 1
+        check_month = (month_seq % 12) + 1
+        check_year = event_year + (month_seq // 12)
         val = arrivals_idx.get((check_year, check_month))
-        if val is not None and val >= target:
+        baseline = baselines.get(t, 0.0)
+
+        if val is None or baseline <= 0:
+            continue
+
+        if val >= recovery_threshold * baseline:
             if t == 1:
                 return 0, False
             return t - 1, False

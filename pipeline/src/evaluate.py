@@ -143,7 +143,7 @@ def summarize_experiment(
     results: dict[str, dict],
     experiment_name: str,
     alpha: float = 0.05,
-    n_bootstrap: int = 200,
+    n_bootstrap: int = 1000,
 ) -> pd.DataFrame:
     """
     Aggregate metrics across all models for one experiment.

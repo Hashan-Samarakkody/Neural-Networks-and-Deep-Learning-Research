@@ -66,7 +66,7 @@ All experimental settings are in `pipeline/configs/model_config.yaml`:
 
 ## Known Limitations
 
-1. **Zero-inflation:** 58.5% zero-month recoveries. Two-stage classifier+regressor not yet implemented; ordinary regression is suboptimal for this target distribution.
+1. **Zero-inflation:** 58.5% zero-month recoveries. Two-stage zero-inflated model (LogisticRegression + Ridge) implemented; stage-1 classifier separates T_rec=0 from T_rec>0 events. Hyperparameters fixed (C=1, α=1) due to small non-zero N (~12 events per LOOCV fold); nested CV feasible once N_nonzero > 30.
 2. **Small N:** N=51/23 makes bootstrap CIs wide. Findings are exploratory.
 3. **Exp B conformal PI:** Empirical test-set coverage reported — not a valid conformal prediction guarantee (requires separate calibration partition).
 4. **Static DTII:** District tourism importance shares are point-in-time; do not reflect hotel openings/closures 2000–2025.
