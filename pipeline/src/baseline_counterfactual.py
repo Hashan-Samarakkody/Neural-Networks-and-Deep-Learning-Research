@@ -110,15 +110,18 @@ def compute_recovery_months(
     max_months: int = 12,
     crisis_years: set | None = None,
     method: str = "seasonal_mean",
-) -> tuple[int, dict, bool]:
+    persistence: int = 1,
+) -> tuple[int, dict, bool, dict]:
     """
     Compute T_rec for a single disaster event.
 
     Returns:
-        (T_rec, baselines_dict, is_right_censored)
+        (T_rec, baselines_dict, is_right_censored, extras)
 
+    extras contains: depth, months_below_threshold, pre_event_ratio.
     T_rec = 0  if month immediately after disaster meets threshold
     T_rec = 12 if recovery not achieved within max_months (right-censored)
+    persistence: consecutive months above threshold required (S-03).
     """
     if crisis_years is None:
         crisis_years = CRISIS_YEARS
@@ -135,6 +138,21 @@ def compute_recovery_months(
         except KeyError:
             return np.nan
 
+    pre_event = baselines.get(0, 0.0)
+    event_month_seq = disaster_month - 1
+    event_actual_month = (event_month_seq % 12) + 1
+    event_actual_year = disaster_year + (event_month_seq // 12)
+    actual_at_event = get_arrivals(event_actual_year, event_actual_month)
+    pre_event_ratio = (
+        float(actual_at_event / pre_event)
+        if (pre_event > 0 and not pd.isna(actual_at_event))
+        else np.nan
+    )
+
+    months_below = 0
+    max_depth = 0.0
+    consec = 0
+
     for t in range(1, max_months + 1):
         month_seq = disaster_month + t - 1
         target_month = (month_seq % 12) + 1
@@ -145,12 +163,31 @@ def compute_recovery_months(
         if pd.isna(actual) or baseline <= 0:
             continue
 
-        if actual >= threshold * baseline:
-            if t == 1:
-                return 0, baselines, False
-            return t - 1, baselines, False
+        ratio = actual / baseline
+        if ratio < threshold:
+            months_below += 1
+            depth = 1.0 - ratio
+            if depth > max_depth:
+                max_depth = depth
+            consec = 0
+        else:
+            consec += 1
+            if consec >= persistence:
+                extras = {
+                    "depth": round(max_depth, 4),
+                    "months_below_threshold": months_below,
+                    "pre_event_ratio": round(pre_event_ratio, 4) if not pd.isna(pre_event_ratio) else np.nan,
+                }
+                if t == 1 and consec == 1:
+                    return 0, baselines, False, extras
+                return t - consec, baselines, False, extras
 
-    return max_months, baselines, True
+    extras = {
+        "depth": round(max_depth, 4),
+        "months_below_threshold": months_below,
+        "pre_event_ratio": round(pre_event_ratio, 4) if not pd.isna(pre_event_ratio) else np.nan,
+    }
+    return max_months, baselines, True, extras
 
 
 def _count_reference_years(
@@ -208,6 +245,7 @@ def build_recovery_targets(
     max_months = cfg["experiment"]["max_recovery_months"]
     min_ref = cfg.get("baseline", {}).get("min_reference_years", 2)
     method = cfg.get("baseline", {}).get("method", "seasonal_mean")
+    persistence = cfg.get("recovery", {}).get("persistence_months", 1)
 
     shock_cfg = cfg["external_shocks"]
     crisis_years = set()
@@ -223,12 +261,12 @@ def build_recovery_targets(
         insufficient = n_ref < min_ref
 
         if insufficient:
-            t_rec, baselines, censored = np.nan, {}, False
+            t_rec, baselines, censored, extras = np.nan, {}, False, {}
         else:
-            t_rec, baselines, censored = compute_recovery_months(
+            t_rec, baselines, censored, extras = compute_recovery_months(
                 arrivals, year, month, K=K,
                 threshold=threshold, max_months=max_months,
-                crisis_years=crisis_years, method=method,
+                crisis_years=crisis_years, method=method, persistence=persistence,
             )
 
         records.append({
@@ -238,6 +276,9 @@ def build_recovery_targets(
             "is_right_censored": censored,
             "n_reference_years_min": n_ref,
             "baseline_insufficient": insufficient,
+            "depth": extras.get("depth", np.nan),
+            "months_below_threshold": extras.get("months_below_threshold", np.nan),
+            "pre_event_ratio": extras.get("pre_event_ratio", np.nan),
         })
 
     return pd.DataFrame(records)
