@@ -217,20 +217,12 @@ def main():
     _p(f"      Empirical coverage: {pi_A['empirical_coverage'] * 100:.1f}%")
 
     if "TwoStage" in results_A:
-        ts = results_A["TwoStage"]
         from two_stage_model import stage1_loocv_accuracy
-        # Approximate stage1 accuracy from integrated LOOCV results
-        y_true_bin = [int(v > 0) for v in ts["y_true"]]
-        y_pred_bin = [int(round(p) > 0) for p in ts["y_pred"]]
-        from sklearn.metrics import accuracy_score, f1_score
-        s1_acc = {
-            "stage1_accuracy": round(accuracy_score(y_true_bin, y_pred_bin), 4),
-            "stage1_f1_nonzero": round(f1_score(y_true_bin, y_pred_bin, zero_division=0), 4),
-            "stage1_n_zero": int(sum(1 for v in y_true_bin if v == 0)),
-            "stage1_n_nonzero": int(sum(1 for v in y_true_bin if v == 1)),
-        }
+        s1_acc = stage1_loocv_accuracy(X_A, y_A)
         _p(f"      Stage-1 accuracy: {s1_acc['stage1_accuracy']} | "
-           f"F1(non-zero): {s1_acc['stage1_f1_nonzero']}")
+           f"F1(non-zero): {s1_acc['stage1_f1_nonzero']} | "
+           f"AUC: {s1_acc['stage1_auc']} | "
+           f"majority_rate: {s1_acc['stage1_majority_rate']}")
 
     summary_A = summarize_experiment(results_A, "ExpA_LOOCV")
     _p("\n      --- Experiment A Results ---")
@@ -340,8 +332,8 @@ def main():
     all_results = pd.concat([summary_A, summary_B] + extra_summaries, ignore_index=True)
     all_results.to_csv(results_dir / "experiment_results.csv", index=False)
     tests_df.to_csv(results_dir / "wilcoxon_tests.csv", index=False)
-    if "s1_acc" in dir():
-        with open(results_dir / "two_stage_stage1_accuracy.json", "w") as f:
+    if "s1_acc" in locals():
+        with open(results_dir / "two_stage_stage1.json", "w") as f:
             json.dump(s1_acc, f, indent=2)
 
     if xgb_res_B:
