@@ -501,6 +501,14 @@ def main():
     with open(results_dir / "run_manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
+    # ── S-10: paper_numbers.json ───────────────────────────────────────────
+    try:
+        from paper_numbers import extract_paper_numbers
+        pn = extract_paper_numbers(results_dir)
+        _p(f"\n[PAPER] paper_numbers.json written ({len(pn)} keys).")
+    except Exception as e:
+        _p(f"      [WARN] paper_numbers.json skipped: {e}")
+
     _p("\n" + "=" * 70)
     _p("Pipeline complete. Outputs written to:")
     _p(f"  Results: {results_dir.resolve()}")
