@@ -145,6 +145,7 @@ def main():
     df_B = df_with_targets.reset_index(drop=True)
     y_A = df_A["recovery_months"].values
     y_B = df_B["recovery_months"].values
+    X_A = df_feat_ref[mask_clean.values][FEATURE_COLS].values
 
     _p(f"      Experiment A (pure natural hazards): N = {len(df_A)}")
     _p(f"      Experiment B (all events incl. shocks): N = {len(df_B)}")
@@ -322,12 +323,11 @@ def main():
 
         sens_cfg = cfg.get("sensitivity_analysis", {})
         sens_df = run_full_sensitivity(
-            df_A, arrivals,
+            X_A, y_A, df_A, arrivals,
             XGBRegressor, xgb_default_params,
             thresholds=sens_cfg.get("thresholds", [0.80, 0.90, 1.00]),
             baseline_windows=sens_cfg.get("baseline_windows", [3, 6, 12]),
             crisis_years=crisis_years,
-            cfg=cfg,
             results_dir=results_dir,
             seed=SEED,
         )
