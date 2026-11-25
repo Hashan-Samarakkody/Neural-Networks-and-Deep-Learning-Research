@@ -26,6 +26,11 @@ Branch: `fix/revision-4`.
 | S-13 | 8926b3a | regime column (baseline/easter_covid_crisis/post_crisis/confounded) in predictions + results |
 | S-14 | 3318306 | supplementary_event_table missing columns + dtii_report.csv |
 | S-15 | c50f6b5 | event_flow: raw_emdat_records=86; full 86→80→65→60 flow; arithmetic assertion |
+| S-16 | 8351e30 | README Key Findings updated from paper_numbers.json; CHANGELOG_AUDIT.md S-01..S-15 |
+| S-17 | c8f5150 | MIT LICENSE, CITATION.cff, docs/DATA_AVAILABILITY.md |
+| S-18 | 4d3670f | permutation_importance, grouped_importance, VIF, ablation_no_index CSVs |
+| S-19 | cfdce58 | DATA_PROVENANCE.md 2025 provisional status; macro_lag_years sensitivity CSV |
+| S-20 | fa9b7a5 | tests: persistence rule, trend baselines, block_events param, Holm correction; 45 tests pass |
 
 ---
 
