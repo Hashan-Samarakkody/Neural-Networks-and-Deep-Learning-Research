@@ -48,7 +48,8 @@ def compute_baseline(
 
     def _baseline_for_month(target_month: int, target_year: int) -> float:
         valid_years = []
-        y = target_year - 1
+        # Never use disaster_year or later as reference (R-03: no future leakage)
+        y = min(target_year - 1, disaster_year - 1)
         while len(valid_years) < K:
             if y < arrivals["year"].min():
                 break

@@ -284,7 +284,7 @@ def naive_baselines_loocv(y: np.ndarray, df: pd.DataFrame = None) -> dict:
 
         # LastKnown: most recent event j < i whose 12-month window closed
         if onsets is not None:
-            lk_pred = float(np.median(other))  # fallback
+            lk_pred = float("nan")  # R-09: NaN when no prior closed window
             current_onset = onsets[i]
             for j in range(i - 1, -1, -1):
                 if j == i:
