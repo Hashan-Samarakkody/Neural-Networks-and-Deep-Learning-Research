@@ -241,6 +241,12 @@ def main():
     # R-16: save per-event predictions
     _save_predictions(results_B_eval, df_B.iloc[test_idx].reset_index(drop=True), "ExpB_Chronological", results_dir)
 
+    # ── S-04: Survival analysis ────────────────────────────────────────────
+    _p("\n[SURV] Survival analysis (CoxPH + CoxnetAFT)...")
+    from survival import export_survival_results
+    surv_df = export_survival_results(df_B, cfg, train_idx, test_idx, results_dir)
+    _p(f"      Survival models: {surv_df[['model','c_index','integrated_brier_score']].to_string(index=False)}")
+
     # ── 6. Wilcoxon tests ──────────────────────────────────────────────────
     _p("\n[6/6] Wilcoxon signed-rank tests...")
     y_true_A = np.array(results_A["XGBoost"]["y_true"])
