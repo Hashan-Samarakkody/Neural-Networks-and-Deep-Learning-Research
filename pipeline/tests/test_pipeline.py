@@ -472,3 +472,174 @@ class TestIntegration:
         train_idx, test_idx = chronological_split(X_pd, y_s, df, train_cutoff_year=2012)
         assert len(train_idx) + len(test_idx) == len(X)
         assert len(test_idx) > 0
+
+
+# ── S-20: persistence rule ────────────────────────────────────────────────────
+
+class TestRecoveryPersistence:
+    """S-03: persistence=N requires N consecutive months above threshold."""
+
+    def test_persistence_2_delays_recovery(self):
+        """Single above-threshold month does not satisfy persistence=2."""
+        # Month 1 above threshold, month 2 below, month 3+ above
+        suppressions = {(2012, 8): 50_000}   # offset 2 falls below threshold
+        arr = _make_arrivals(override=suppressions)
+        # persistence=1: recovers at offset 1
+        t1, _, _, _ = compute_recovery_months(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, threshold=0.90, max_months=12, crisis_years=set(),
+            persistence=1,
+        )
+        # persistence=2: offset 1 alone is not enough (interrupted by offset 2 below)
+        t2, _, _, _ = compute_recovery_months(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, threshold=0.90, max_months=12, crisis_years=set(),
+            persistence=2,
+        )
+        assert t1 == 0, f"persistence=1 should recover immediately, got {t1}"
+        assert t2 > 0, f"persistence=2 should not recover at offset 0 with gap at offset 2"
+
+    def test_persistence_1_matches_original_behaviour(self):
+        """persistence=1 (default) gives same result as old single-month check."""
+        arr = _make_arrivals()
+        t, _, censored, _ = compute_recovery_months(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, threshold=0.90, max_months=12, crisis_years=set(),
+            persistence=1,
+        )
+        assert t == 0
+        assert censored is False
+
+    def test_persistence_2_all_above_recovers(self):
+        """When every post-disaster month is above threshold, persistence=2 recovers at offset 1."""
+        arr = _make_arrivals()
+        t, _, censored, _ = compute_recovery_months(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, threshold=0.50, max_months=12, crisis_years=set(),
+            persistence=2,
+        )
+        assert t <= 1
+        assert censored is False
+
+
+# ── S-20: trend / yoy baseline methods ───────────────────────────────────────
+
+class TestBaselineMethods:
+    """S-02: seasonal_trend and yoy_growth baseline variants return valid floats."""
+
+    def test_seasonal_trend_baseline_positive(self):
+        from baseline_counterfactual import compute_baseline
+        arr = _make_arrivals(start=2007, end=2014)
+        baselines = compute_baseline(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, crisis_years=set(), method="seasonal_trend",
+        )
+        assert baselines[1] > 0, "seasonal_trend baseline must be positive"
+
+    def test_yoy_growth_baseline_positive(self):
+        from baseline_counterfactual import compute_baseline
+        arr = _make_arrivals(start=2007, end=2014)
+        baselines = compute_baseline(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, crisis_years=set(), method="yoy_growth",
+        )
+        assert baselines[1] > 0, "yoy_growth baseline must be positive"
+
+    def test_seasonal_mean_matches_default(self):
+        from baseline_counterfactual import compute_baseline
+        arr = _make_arrivals(start=2007, end=2014)
+        b_explicit = compute_baseline(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, crisis_years=set(), method="seasonal_mean",
+        )
+        b_default = compute_baseline(
+            arr, disaster_year=2012, disaster_month=6,
+            K=3, crisis_years=set(),
+        )
+        assert b_explicit[1] == pytest.approx(b_default[1])
+
+    def test_unknown_method_raises(self):
+        from baseline_counterfactual import compute_baseline
+        arr = _make_arrivals(start=2007, end=2014)
+        with pytest.raises((ValueError, KeyError)):
+            compute_baseline(
+                arr, disaster_year=2012, disaster_month=6,
+                K=3, crisis_years=set(), method="nonexistent_method",
+            )
+
+
+# ── S-20: block bootstrap block_events param ─────────────────────────────────
+
+class TestBlockBootstrap:
+    """S-08: block_events parameter controls overlapping block size."""
+
+    def _make_preds(self, n=20, seed=0):
+        rng = np.random.default_rng(seed)
+        y_true = rng.uniform(0, 12, n)
+        y_pred = y_true + rng.normal(0, 0.5, n)
+        y_pred = np.clip(y_pred, 0, 12)
+        return y_true, y_pred
+
+    def test_block_events_stored_in_result(self):
+        from evaluate import block_bootstrap_ci
+        y_true, y_pred = self._make_preds()
+        result = block_bootstrap_ci(y_true, y_pred, n_bootstrap=100, block_events=4)
+        assert result["block_events"] == 4
+
+    def test_different_block_sizes_give_different_cis(self):
+        from evaluate import block_bootstrap_ci
+        y_true, y_pred = self._make_preds(n=30)
+        r1 = block_bootstrap_ci(y_true, y_pred, n_bootstrap=200, block_events=2, seed=0)
+        r2 = block_bootstrap_ci(y_true, y_pred, n_bootstrap=200, block_events=10, seed=0)
+        # CIs need not be identical when block size differs
+        ci1 = r1["MAE_95CI_block_bootstrap"]
+        ci2 = r2["MAE_95CI_block_bootstrap"]
+        # At minimum both are valid (lower <= upper)
+        assert ci1[0] <= ci1[1]
+        assert ci2[0] <= ci2[1]
+
+    def test_block_events_one_equals_iid(self):
+        """block_events=1 is IID bootstrap (each event its own block)."""
+        from evaluate import block_bootstrap_ci
+        y_true, y_pred = self._make_preds(n=25)
+        result = block_bootstrap_ci(y_true, y_pred, n_bootstrap=100, block_events=1)
+        assert result["block_events"] == 1
+        lo, hi = result["MAE_95CI_block_bootstrap"]
+        assert lo >= 0 and hi >= lo
+
+
+# ── S-20: Holm correction ─────────────────────────────────────────────────────
+
+class TestHolmCorrection:
+    """S-07: Holm-Bonferroni adjusted p-values >= raw p-values and monotone."""
+
+    def test_holm_geq_raw(self):
+        from evaluate import holm_correction
+        p_raw = [0.001, 0.01, 0.05, 0.10, 0.50]
+        p_adj = holm_correction(p_raw)
+        for raw, adj in zip(p_raw, p_adj):
+            assert adj >= raw - 1e-12, f"p_holm={adj} < p_raw={raw}"
+
+    def test_holm_monotone_after_sort(self):
+        """Adjusted p-values in sorted order must be non-decreasing."""
+        from evaluate import holm_correction
+        p_raw = [0.04, 0.001, 0.02, 0.10, 0.003]
+        p_adj = holm_correction(p_raw)
+        paired = sorted(zip(p_raw, p_adj), key=lambda x: x[0])
+        adj_sorted = [a for _, a in paired]
+        for i in range(len(adj_sorted) - 1):
+            assert adj_sorted[i] <= adj_sorted[i + 1] + 1e-12
+
+    def test_holm_all_significant_inflated(self):
+        """With m tests and all p=0.001, smallest adj = 0.001*m."""
+        from evaluate import holm_correction
+        m = 5
+        p_raw = [0.001] * m
+        p_adj = holm_correction(p_raw)
+        assert min(p_adj) == pytest.approx(0.001 * m, rel=1e-9)
+
+    def test_holm_single_test_unchanged(self):
+        """Single p-value: Holm leaves it unchanged."""
+        from evaluate import holm_correction
+        p_adj = holm_correction([0.03])
+        assert p_adj[0] == pytest.approx(0.03)

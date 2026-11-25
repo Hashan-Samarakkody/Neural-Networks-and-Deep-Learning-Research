@@ -61,6 +61,10 @@ def compute_baseline(
     Returns a dict: {month_offset (1..12): baseline_arrivals}
     month_offset 0 = disaster month itself (used for T_rec = 0 check).
     """
+    _VALID_METHODS = {"seasonal_mean", "seasonal_trend", "yoy_growth"}
+    if method not in _VALID_METHODS:
+        raise ValueError(f"Unknown baseline method '{method}'. Valid: {_VALID_METHODS}")
+
     if crisis_years is None:
         crisis_years = CRISIS_YEARS
 
