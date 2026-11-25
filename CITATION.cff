@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Predicting Tourism Recovery Duration Following Natural Disasters in Sri Lanka"
+version: "1.0.0"
+date-released: "2026-11-25"
+authors:
+  - family-names: Samarakkody
+    given-names: Hashan
+repository-code: "https://github.com/Hashan-Samarakkody/Neural-Networks-and-Deep-Learning-Research"
+abstract: >
+  Machine learning pipeline for predicting monthly tourism recovery duration
+  after natural disasters in Sri Lanka (2000–2025). Uses seasonally adjusted
+  counterfactual baselines, nested cross-validation, and tree-SHAP explainability.
+  Covers 60 disaster events from EM-DAT with SLTDA monthly arrivals data.
+keywords:
+  - tourism recovery
+  - natural disasters
+  - machine learning
+  - Sri Lanka
+  - survival analysis
+license: MIT
