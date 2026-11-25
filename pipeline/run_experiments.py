@@ -565,6 +565,50 @@ def main():
     with open(results_dir / "run_manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
+    # ── S-19: macro lag sensitivity ───────────────────────────────────────
+    _p("\n[MACLAG] S-19: macro_lag_years sensitivity (GDP lag 0/1/2)...")
+    try:
+        from feature_engineering import get_macro_features, FEATURE_COLS as FC
+        from sklearn.metrics import mean_absolute_error as _mae
+        import xgboost as _xgb
+        from preprocess import FeatureBuilder as _FB
+        from sklearn.model_selection import LeaveOneOut as _LOO
+
+        lag_rows = []
+        for lag in [0, 1, 2]:
+            # Build feature matrix with shifted GDP year
+            df_lag = df_A.copy()
+            gdp_lag = []
+            for _, row in df_lag.iterrows():
+                try:
+                    m = get_macro_features(int(row["start_year"]) - lag)
+                    gdp_lag.append(m.get("gdp_growth", 0.0))
+                except KeyError:
+                    gdp_lag.append(0.0)
+            df_lag["gdp_growth_lag"] = gdp_lag
+
+            # Quick LOOCV with XGBoost using modified gdp_growth
+            fb_l = _FB(cfg)
+            fb_l.fit(df_lag)
+            df_feat_l = fb_l.transform(df_lag)
+            df_feat_l["gdp_growth"] = df_lag["gdp_growth_lag"].values
+            X_l = df_feat_l[FC].values
+            y_l = y_A
+
+            loo_p, loo_t = [], []
+            for tr, te in _LOO().split(X_l):
+                m_xgb = _xgb.XGBRegressor(random_state=SEED, verbosity=0, nthread=1)
+                m_xgb.fit(X_l[tr], y_l[tr])
+                loo_p.append(float(np.clip(m_xgb.predict(X_l[te])[0], 0, 12)))
+                loo_t.append(float(y_l[te[0]]))
+            lag_mae = round(float(_mae(loo_t, loo_p)), 4)
+            lag_rows.append({"gdp_lag_years": lag, "MAE": lag_mae, "n_events": len(y_l)})
+            _p(f"      gdp_lag={lag}: MAE={lag_mae}")
+
+        pd.DataFrame(lag_rows).to_csv(results_dir / "macro_lag_sensitivity.csv", index=False)
+    except Exception as e:
+        _p(f"      [WARN] macro_lag sensitivity skipped: {e}")
+
     # ── S-10: paper_numbers.json ───────────────────────────────────────────
     try:
         from paper_numbers import extract_paper_numbers
