@@ -95,6 +95,8 @@ def compute_metrics_with_ci(
     rng = np.random.default_rng(seed)
     y_true = np.array(y_true, dtype=float)
     y_pred = np.array(y_pred, dtype=float)
+    mask = ~(np.isnan(y_true) | np.isnan(y_pred))
+    y_true, y_pred = y_true[mask], y_pred[mask]
 
     block_result = block_bootstrap_ci(y_true, y_pred, n_bootstrap=n_bootstrap, seed=seed)
     base = compute_metrics(y_true, y_pred)
