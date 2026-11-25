@@ -61,7 +61,7 @@ class TestRecoveryMonths:
 
     def test_immediate_recovery_gives_zero(self):
         """Month-after-disaster already at 100k >= 90k → T_rec=0."""
-        t, _, censored = compute_recovery_months(
+        t, _, censored, _ = compute_recovery_months(
             self.ARRIVALS, disaster_year=2012, disaster_month=6,
             K=3, threshold=0.90, max_months=12, crisis_years=set(),
         )
@@ -71,7 +71,7 @@ class TestRecoveryMonths:
     def test_delayed_recovery(self):
         """Months 7-8 suppressed; month 9 recovers → T_rec=2."""
         arr = _make_arrivals(override={(2012, 7): 50_000, (2012, 8): 50_000})
-        t, _, censored = compute_recovery_months(
+        t, _, censored, _ = compute_recovery_months(
             arr, disaster_year=2012, disaster_month=6,
             K=3, threshold=0.90, max_months=12, crisis_years=set(),
         )
@@ -83,7 +83,7 @@ class TestRecoveryMonths:
         suppressions = {(2012, m): 50_000 for m in range(7, 13)}
         suppressions.update({(2013, m): 50_000 for m in range(1, 7)})
         arr = _make_arrivals(override=suppressions)
-        t, _, censored = compute_recovery_months(
+        t, _, censored, _ = compute_recovery_months(
             arr, disaster_year=2012, disaster_month=6,
             K=3, threshold=0.90, max_months=12, crisis_years=set(),
         )
@@ -93,7 +93,7 @@ class TestRecoveryMonths:
     def test_crisis_year_exclusion_no_fallback(self):
         """R-03: no all-years fallback. All prior years are crisis years → baseline=0, skip offset."""
         arr = _make_arrivals(start=2010, end=2012)
-        t, baselines, _ = compute_recovery_months(
+        t, baselines, _, _ = compute_recovery_months(
             arr, disaster_year=2012, disaster_month=6,
             K=3, threshold=0.90, max_months=12,
             crisis_years={2009, 2010, 2011},
@@ -109,7 +109,7 @@ class TestRecoveryMonths:
             override={(2013, 1): 50_000, (2013, 2): 50_000},
             start=2008, end=2014,
         )
-        t, baselines, _ = compute_recovery_months(
+        t, baselines, _, _ = compute_recovery_months(
             arr_mod, disaster_year=2012, disaster_month=12,
             K=3, threshold=0.90, max_months=12, crisis_years=set(),
         )
@@ -122,7 +122,7 @@ class TestRecoveryMonths:
         """R-03: baseline must only use years strictly before the disaster year."""
         # Arrivals only: 2010-2014. Disaster in 2010 → prior year 2009 missing.
         arr = _make_arrivals(start=2010, end=2014)
-        t, baselines, _ = compute_recovery_months(
+        t, baselines, _, _ = compute_recovery_months(
             arr, disaster_year=2010, disaster_month=6,
             K=3, threshold=0.90, max_months=12, crisis_years=set(),
         )
