@@ -1,0 +1,3 @@
+Experiment,type,conformal_q_hat,pi_lower_offset,pi_upper_offset,pi_half_width_months,empirical_coverage,target_coverage,empirical_test_coverage,note
+A (LOOCV),conformal_PI_heuristic,4.0036,-4.0036,4.0036,4.0036,0.9783,0.95,,
+B (Chronological),empirical_test_coverage_only,,,,,,,0.9130434782608695,Empirical test-set coverage only — not a conformal guarantee (ISS-C02).

@@ -1,0 +1,114 @@
+﻿======================================================================
+Tourism Recovery Duration Prediction Pipeline
+Fold-safe features | Chronological split | Log1p DSI |
+Conformal PI | Nested CV | 8 features | No data leakage
+======================================================================
+
+[1/6] Loading data...
+      312 monthly arrival records (2000-2025)
+      65 physical disaster events (after taxonomy filter + clustering)
+
+[2/6] Computing seasonally adjusted recovery targets...
+      Dropping 5 events with insufficient baseline history (R-03)
+      Dropped: [{'disaster_id': '2000-0613-LKA', 'start_year': 2000, 'start_month': 9}, {'disaster_id': '2000-0741-LKA', 'start_year': 2000, 'start_month': 11}, {'disaster_id': '2000-0831-LKA', 'start_year': 2000, 'start_month': 12}, {'disaster_id': '2001-0049-LKA', 'start_year': 2001, 'start_month': 2}, {'disaster_id': '2001-9498-LKA', 'start_year': 2001, 'start_month': 9}]
+      N events (valid target): 60
+      Median recovery: 0.0 months | Mean: 2.9 months
+      Right-censored at 12 months: 10 (16.7%)
+      Zero-month recoveries: 38
+
+[3/6] Reference feature matrix (fold-safe inside loops)...
+      Reference feature matrix shape: (60, 8)
+      Features: DSI, TWDI, Season_sin, Season_cos, global_tourism_idx, gdp_growth, Economic_Condition_Index, external_shock_flag
+      Experiment A (pure natural hazards): N = 46
+      Experiment B (all events incl. shocks): N = 60
+
+[4/6] Experiment A -- LOOCV on pure natural hazards...
+      LOOCV fold 1/46
+      LOOCV fold 10/46
+      LOOCV fold 20/46
+      LOOCV fold 30/46
+      LOOCV fold 40/46
+      XGBoost conformal PI half-width (heuristic): +/-4.0036 months
+      Empirical coverage: 97.8%
+      Stage-1 accuracy: 0.8696 | F1(non-zero): 0.7
+
+      --- Experiment A Results ---
+               Model    MAE   RMSE      R2
+            TwoStage 0.7527 1.8650  0.4335
+             XGBoost 0.9327 1.6070  0.5794
+        RandomForest 1.0596 1.6932  0.5331
+         NaiveMedian 1.1087 2.7147 -0.2002
+                 SVR 1.1417 2.6759 -0.1661
+NaivePrevious_Oracle 1.1551 2.5250 -0.0383
+               Ridge 1.4924 2.1907  0.2184
+           NaiveMean 1.7836 2.5330 -0.0449
+      NaiveLastKnown 1.7955 3.3609 -0.7757
+
+[5/6] Experiment B -- Chronological split (train <=2018, test >=2019)...
+      Train N=37, Test N=23
+
+      --- Experiment B Results ---
+               Model    MAE   RMSE      R2
+            TwoStage 3.5038 4.3537  0.3698
+               Ridge 4.8835 6.2323 -0.2913
+        RandomForest 5.1473 6.9125 -0.5885
+             XGBoost 5.3833 7.1923 -0.7197
+           NaiveMean 5.7274 7.5358 -0.8879
+                 SVR 6.0760 8.1724 -1.2204
+         NaiveMedian 6.0870 8.1933 -1.2318
+NaivePrevious_Oracle 6.0870 8.1933 -1.2318
+      NaiveLastKnown 6.0870 8.1933 -1.2318
+
+[6/6] Wilcoxon signed-rank tests...
+      XGBoost vs RandomForest: p=0.036369 YES
+      XGBoost vs Ridge: p=0.000569 YES
+      XGBoost vs SVR: p=0.286461 NO
+      XGBoost vs TwoStage: p=0.032678 YES
+      XGBoost vs NaiveMean: p=0.000108 YES
+      XGBoost vs NaiveMedian: p=0.247601 NO
+      XGBoost vs NaiveLastKnown: p=nan NO
+      XGBoost vs NaivePrevious_Oracle: p=0.860004 NO
+
+      Event flow: {'raw_emdat_records': 65, 'physical_disasters_after_cluster': 65, 'events_baseline_insufficient': 5, 'events_valid_target': 60, 'events_right_censored': 10, 'events_zero_months': 38, 'events_in_crisis_window': 14, 'exp_A_N': 46, 'exp_B_N': 60, 'exp_B_train_N': 37, 'exp_B_test_N': 23}
+
+[SUPP] Supplementary outputs...
+      Event-level table: 60 rows → supplementary_event_table.csv
+      Correlation matrix → feature_correlation_matrix.csv + .png
+      Target distribution plot exported.
+      Hazard-type performance breakdown:
+        Drought: N=3 MAE=0.0303 R2=0.0
+        Storm: N=8 MAE=0.7584 R2=0.8589
+        mixed: N=4 MAE=0.9152 R2=-0.2759
+        Flood: N=30 MAE=1.1029 R2=0.3681
+
+      Running SHAP analysis on XGBoost (Experiment B)...
+      SHAP feature ranking:
+         1. Global Tourism Index: 0.5332
+         2. GDP Growth Rate: 0.3653
+         3. Seasonality (Sine): 0.3107
+         4. Economic Condition Index: 0.2950
+         5. Seasonality (Cosine): 0.2776
+         6. Tourism-Weighted Disaster Impact: 0.2474
+         7. Disaster Severity Index: 0.1468
+         8. External Shock Flag: 0.0000
+      RQ1-RQ4 summary → rq_summary.json
+
+[SENS] Sensitivity analysis (threshold x baseline window)...
+      Sensitivity: threshold=80% window=3yr MAE=0.3127 RMSE=0.7494 R2=-0.8541 N=46
+      Sensitivity: threshold=80% window=6yr MAE=0.0435 RMSE=0.2949 R2=-0.0222 N=46
+      Sensitivity: threshold=80% window=12yr MAE=0.0435 RMSE=0.2949 R2=-0.0222 N=46
+      Sensitivity: threshold=90% window=3yr MAE=1.3475 RMSE=2.3681 R2=0.1019 N=46
+      Sensitivity: threshold=90% window=6yr MAE=0.8095 RMSE=1.9494 R2=-0.1564 N=46
+      Sensitivity: threshold=90% window=12yr MAE=0.0652 RMSE=0.4423 R2=-0.0222 N=46
+      Sensitivity: threshold=100% window=3yr MAE=1.0897 RMSE=1.9317 R2=0.7139 N=46
+      Sensitivity: threshold=100% window=6yr MAE=1.6568 RMSE=3.4175 R2=0.1892 N=46
+      Sensitivity: threshold=100% window=12yr MAE=1.7359 RMSE=3.4833 R2=-0.712 N=46
+      Sensitivity grid: 9 combinations.
+
+======================================================================
+Pipeline complete. Outputs written to:
+  Results: F:\Neural Networks and Deep Learning Research\pipeline\outputs\results
+  Figures: F:\Neural Networks and Deep Learning Research\pipeline\outputs\figures
+======================================================================
+
+NOTE: All reported metrics come from this deterministic run (seed=42).

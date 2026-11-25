@@ -1,0 +1,6 @@
+{
+  "stage1_accuracy": 0.8696,
+  "stage1_f1_nonzero": 0.7,
+  "stage1_n_zero": 36,
+  "stage1_n_nonzero": 10
+}

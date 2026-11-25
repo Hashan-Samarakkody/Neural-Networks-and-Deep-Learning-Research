@@ -1,0 +1,13 @@
+{
+  "raw_emdat_records": 65,
+  "physical_disasters_after_cluster": 65,
+  "events_baseline_insufficient": 5,
+  "events_valid_target": 60,
+  "events_right_censored": 10,
+  "events_zero_months": 38,
+  "events_in_crisis_window": 14,
+  "exp_A_N": 46,
+  "exp_B_N": 60,
+  "exp_B_train_N": 37,
+  "exp_B_test_N": 23
+}
