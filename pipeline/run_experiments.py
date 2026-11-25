@@ -14,6 +14,7 @@ Outputs written to outputs/results/ and outputs/figures/.
 
 import sys
 import json
+import subprocess
 import traceback
 import warnings
 from pathlib import Path
@@ -23,6 +24,38 @@ import numpy as np
 import pandas as pd
 
 warnings.filterwarnings("ignore")
+
+PINNED = {
+    "xgboost": ("2.1.1", "!="),   # != means warn if differs
+    "numpy": ("2.0.2", "!="),
+    "shap": ("0.46.0", "!="),
+}
+
+
+def _assert_versions():
+    import importlib.metadata
+    mismatches = []
+    for pkg, (expected, op) in PINNED.items():
+        try:
+            actual = importlib.metadata.version(pkg)
+        except importlib.metadata.PackageNotFoundError:
+            actual = "not installed"
+        if op == "!=" and actual != expected:
+            mismatches.append(f"  {pkg}: expected {expected}, got {actual}")
+    if mismatches:
+        print("[VERSION WARNING] Library versions differ from frozen run:")
+        for m in mismatches:
+            print(m)
+        print("  Results may not reproduce exactly. See docs/VERSION_SENSITIVITY.md")
+
+
+def _get_commit_hash() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return "unknown"
 
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -84,6 +117,7 @@ def main():
     _p("Conformal PI | Nested CV | 8 features | No data leakage")
     _p("=" * 70)
 
+    _assert_versions()
     run_start = datetime.utcnow()
     cfg = load_config(CFG_PATH)
     figures_dir = ROOT / cfg["paths"]["figures_dir"]
@@ -385,7 +419,7 @@ def main():
     import platform, importlib.metadata
     run_end = datetime.utcnow()
     manifest = {
-        "commit": "see git log",
+        "commit": _get_commit_hash(),
         "python_version": sys.version,
         "platform": platform.platform(),
         "seed": SEED,
