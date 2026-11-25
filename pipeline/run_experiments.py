@@ -41,6 +41,7 @@ from evaluate import (
     target_distribution_summary,
 )
 from explainability import run_shap_analysis
+from confounding import flag_confounded_events, run_confounding_variants
 from supplementary import (
     export_event_level_table, export_correlation_matrix,
     export_target_distribution_plot, export_rq_summary,
@@ -311,6 +312,21 @@ def main():
                 _p(f"        {int(row['Rank']):2d}. {row['Display_Name']}: {row['Mean_Abs_SHAP']:.4f}")
 
     export_rq_summary(dist, summary_A, summary_B, tests_df, shap_df, results_dir)
+
+    # ── S-01: Confounding sensitivity ─────────────────────────────────────
+    _p("\n[CONF] Confounding window sensitivity...")
+    try:
+        from xgboost import XGBRegressor as _XGB
+        df_A_flagged = flag_confounded_events(df_A, cfg)
+        conf_df = run_confounding_variants(
+            df_A_flagged, X_A, y_A, cfg, _XGB, {}, results_dir, seed=SEED,
+        )
+        _p(f"      Confounding variants: {conf_df[['variant','n_events','MAE','R2']].to_string(index=False)}")
+        # Carry confounded_by back for event table
+        df_A = df_A_flagged
+        df_B = flag_confounded_events(df_B, cfg)
+    except Exception as e:
+        _p(f"      [WARN] Confounding sensitivity skipped: {e}")
 
     # ── Sensitivity analysis ───────────────────────────────────────────────
     _p("\n[SENS] Sensitivity analysis (threshold x baseline window)...")
