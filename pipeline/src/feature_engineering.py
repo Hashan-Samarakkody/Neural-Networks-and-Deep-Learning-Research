@@ -25,6 +25,7 @@ Additional features:
 
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 
 
@@ -60,12 +61,49 @@ WORLD_BANK_ANNUAL = {
 }
 
 
+_MACRO_CSV_PATH = Path(__file__).parent.parent / "data" / "raw" / "macro_indicators.csv"
+
+# Cache loaded from CSV; falls back to WORLD_BANK_ANNUAL if CSV not present (R-06).
+_macro_cache: dict | None = None
+
+
+def _load_macro_cache() -> dict:
+    global _macro_cache
+    if _macro_cache is not None:
+        return _macro_cache
+    if _MACRO_CSV_PATH.exists():
+        raw = pd.read_csv(_MACRO_CSV_PATH)
+        cache = {}
+        for _, row in raw.iterrows():
+            yr = int(row["year"])
+            if yr not in cache:
+                cache[yr] = {}
+            cache[yr][row["indicator"]] = float(row["value"])
+        # Validate expected indicators exist
+        required = {"gdp_growth", "inflation", "exr_lkr_usd", "global_tourism_idx"}
+        sample_yr = next(iter(cache))
+        missing = required - set(cache[sample_yr].keys())
+        if missing:
+            raise ValueError(f"macro_indicators.csv missing indicators: {missing}")
+        _macro_cache = cache
+    else:
+        # Fallback to hardcoded dict (R-06: remove when CSV is complete)
+        _macro_cache = WORLD_BANK_ANNUAL
+    return _macro_cache
+
+
 def get_macro_features(year: int) -> dict:
-    """Return macro-economic features for a given year (nearest neighbour fallback)."""
-    if year in WORLD_BANK_ANNUAL:
-        return WORLD_BANK_ANNUAL[year]
-    nearest = min(WORLD_BANK_ANNUAL.keys(), key=lambda y: abs(y - year))
-    return WORLD_BANK_ANNUAL[nearest]
+    """
+    R-06: Return macro-economic features for a given year.
+    Loads from data/raw/macro_indicators.csv; raises on missing year.
+    """
+    cache = _load_macro_cache()
+    if year in cache:
+        return cache[year]
+    raise KeyError(
+        f"No macro indicators for year {year} in macro_indicators.csv. "
+        "Add the year or extend the CSV."
+    )
 
 
 def compute_dsi(df: pd.DataFrame) -> tuple[pd.DataFrame, StandardScaler]:
@@ -91,24 +129,43 @@ def compute_dsi(df: pd.DataFrame) -> tuple[pd.DataFrame, StandardScaler]:
 
 def compute_dtii(df: pd.DataFrame, dtii_cfg: dict) -> pd.DataFrame:
     """
-    Map each event's location string to DTII_j (district tourism share).
-    Uses the highest-DTII district mentioned in the location field.
+    R-17: Map each event's location string to DTII_j (district tourism share).
+    Uses word-boundary regex matching. Falls back to mean share and logs misses.
+    Reports matched_district and dtii_rule columns for transparency.
     """
+    import re
     dtii_map = {k.lower(): v for k, v in dtii_cfg.items()}
+    mean_share = float(np.mean(list(dtii_cfg.values())))
+    _unmatched_log = []
 
-    def _max_dtii(location_str: str) -> float:
+    def _max_dtii(location_str: str) -> tuple[float, str]:
         if not isinstance(location_str, str) or not location_str.strip():
-            return float(np.mean(list(dtii_cfg.values())))
-        parts = [p.strip().lower() for p in location_str.replace(";", ",").split(",")]
-        scores = []
-        for p in parts:
-            for district, score in dtii_map.items():
-                if district in p:
-                    scores.append(score)
-        return max(scores) if scores else float(np.mean(list(dtii_cfg.values())))
+            _unmatched_log.append(location_str)
+            return mean_share, "mean_fallback"
+        loc_lower = location_str.lower()
+        best_score = -1.0
+        best_district = None
+        for district, score in dtii_map.items():
+            pattern = r"\b" + re.escape(district) + r"\b"
+            if re.search(pattern, loc_lower):
+                if score > best_score:
+                    best_score = score
+                    best_district = district
+        if best_district is not None:
+            return best_score, best_district
+        _unmatched_log.append(location_str)
+        return mean_share, "mean_fallback"
 
     df = df.copy()
-    df["DTII"] = df["location"].apply(_max_dtii)
+    results = df["location"].apply(_max_dtii)
+    df["DTII"] = results.apply(lambda x: x[0])
+    df["dtii_rule"] = results.apply(lambda x: x[1])
+    if _unmatched_log:
+        import warnings
+        warnings.warn(
+            f"DTII: {len(_unmatched_log)} events fell back to mean share "
+            f"(no district matched): {_unmatched_log[:5]}"
+        )
     return df
 
 
@@ -174,6 +231,45 @@ def add_external_shock_flag(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     df["external_shock_flag"] = df["start_year"].apply(
         lambda y: 1 if int(y) in crisis_years else 0
     )
+    return df
+
+
+def add_post_crisis_recovery_flag(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
+    """
+    R-12: post_crisis_recovery flag for events whose T_rec window overlaps a crisis tail.
+
+    post_crisis_recovery=1 when:
+      (a) event year is in config post_crisis_tail_years, OR
+      (b) event year is in the last year of a crisis block and its onset + 12 months
+          extends into a crisis year (e.g. 2018 events reaching into 2019 Easter attacks).
+
+    Does not modify external_shock_flag; this is a second flag for sensitivity analysis.
+    """
+    df = df.copy()
+
+    shock_cfg = cfg.get("external_shocks", {})
+    crisis_years = set()
+    for rng_pair in shock_cfg.values():
+        crisis_years.update(range(rng_pair[0], rng_pair[1] + 1))
+
+    # post_crisis_tail_years: years in the recovery tail after the crisis block
+    tail_years = set(cfg.get("post_crisis_tail_years", []))
+
+    def _flag(row) -> int:
+        y = int(row["start_year"])
+        m = int(row.get("start_month", 1))
+        # Direct tail years (e.g. 2023)
+        if y in tail_years:
+            return 1
+        # Window overlap: event's 12-month window reaches a crisis year
+        for offset in range(1, 13):
+            month_seq = m + offset - 1
+            target_year = y + (month_seq // 12)
+            if target_year in crisis_years:
+                return 1
+        return 0
+
+    df["post_crisis_recovery"] = df.apply(_flag, axis=1)
     return df
 
 

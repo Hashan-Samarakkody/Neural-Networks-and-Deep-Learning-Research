@@ -26,6 +26,9 @@ external_shocks:
   covid: [2020, 2022]
   economic_crisis: [2022, 2022]
 
+# R-12: years in the recovery tail after the crisis block (get post_crisis_recovery=1 flag)
+post_crisis_tail_years: [2023]
+
 hazard_taxonomy:
   physical_types:
     - Flood
