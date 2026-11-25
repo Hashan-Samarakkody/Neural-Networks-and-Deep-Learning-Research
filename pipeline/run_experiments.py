@@ -313,6 +313,29 @@ def main():
 
     export_rq_summary(dist, summary_A, summary_B, tests_df, shap_df, results_dir)
 
+    # ── S-02: Baseline method comparison ──────────────────────────────────
+    _p("\n[BASE] Baseline method comparison (seasonal_mean / seasonal_trend / yoy_growth)...")
+    try:
+        from baseline_counterfactual import build_recovery_targets as _brt
+        base_rows = []
+        for bmethod in ["seasonal_mean", "seasonal_trend", "yoy_growth"]:
+            cfg_b = {**cfg, "baseline": {**cfg.get("baseline", {}), "method": bmethod}}
+            df_bm = _brt(emdat, arrivals, cfg_b)
+            df_bm = df_bm[~df_bm["baseline_insufficient"]].dropna(subset=["recovery_months"])
+            y_bm = df_bm["recovery_months"].values
+            base_rows.append({
+                "method": bmethod,
+                "n_events": len(y_bm),
+                "median_recovery": float(np.median(y_bm)),
+                "mean_recovery": round(float(np.mean(y_bm)), 3),
+                "n_right_censored": int(np.sum(y_bm == 12)),
+                "n_zero": int(np.sum(y_bm == 0)),
+            })
+            _p(f"      {bmethod}: N={len(y_bm)} median={np.median(y_bm):.1f} mean={np.mean(y_bm):.2f}")
+        pd.DataFrame(base_rows).to_csv(results_dir / "baseline_method_comparison.csv", index=False)
+    except Exception as e:
+        _p(f"      [WARN] Baseline method comparison skipped: {e}")
+
     # ── S-01: Confounding sensitivity ─────────────────────────────────────
     _p("\n[CONF] Confounding window sensitivity...")
     try:

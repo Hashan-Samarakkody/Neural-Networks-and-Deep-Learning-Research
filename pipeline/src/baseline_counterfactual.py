@@ -28,12 +28,32 @@ import pandas as pd
 CRISIS_YEARS = {2019, 2020, 2021, 2022}
 
 
+def _baseline_seasonal_trend(vals: list[float]) -> float:
+    """Log-linear trend fitted to K reference values; extrapolate one step."""
+    if len(vals) < 2:
+        return float(np.mean(vals)) if vals else 0.0
+    log_vals = np.log(np.maximum(vals, 1e-6))
+    xs = np.arange(len(log_vals), dtype=float)
+    slope, intercept = np.polyfit(xs, log_vals, 1)
+    return float(np.exp(intercept + slope * len(log_vals)))
+
+
+def _baseline_yoy_growth(vals: list[float]) -> float:
+    """Mean of values scaled by mean year-on-year growth rate."""
+    if len(vals) < 2:
+        return float(np.mean(vals)) if vals else 0.0
+    ratios = [vals[i] / vals[i - 1] for i in range(1, len(vals)) if vals[i - 1] > 0]
+    mean_growth = float(np.mean(ratios)) if ratios else 1.0
+    return float(np.mean(vals)) * mean_growth
+
+
 def compute_baseline(
     arrivals: pd.DataFrame,
     disaster_year: int,
     disaster_month: int,
     K: int = 3,
     crisis_years: set | None = None,
+    method: str = "seasonal_mean",
 ) -> dict[int, float]:
     """
     Compute the same-month historical counterfactual for each post-disaster month.
@@ -63,9 +83,12 @@ def compute_baseline(
             y -= 1
 
         if not valid_years:
-            # R-03: no all-years fallback; return 0 so offset is skipped
             return 0.0
 
+        if method == "seasonal_trend":
+            return _baseline_seasonal_trend(list(reversed(valid_years)))
+        elif method == "yoy_growth":
+            return _baseline_yoy_growth(list(reversed(valid_years)))
         return float(np.mean(valid_years))
 
     baselines = {}
@@ -86,6 +109,7 @@ def compute_recovery_months(
     threshold: float = 0.90,
     max_months: int = 12,
     crisis_years: set | None = None,
+    method: str = "seasonal_mean",
 ) -> tuple[int, dict, bool]:
     """
     Compute T_rec for a single disaster event.
@@ -100,7 +124,7 @@ def compute_recovery_months(
         crisis_years = CRISIS_YEARS
 
     baselines = compute_baseline(
-        arrivals, disaster_year, disaster_month, K=K, crisis_years=crisis_years
+        arrivals, disaster_year, disaster_month, K=K, crisis_years=crisis_years, method=method,
     )
 
     arr_idx = arrivals.set_index(["year", "month"])["tourist_arrivals"]
@@ -183,6 +207,7 @@ def build_recovery_targets(
     threshold = cfg["experiment"]["recovery_threshold"]
     max_months = cfg["experiment"]["max_recovery_months"]
     min_ref = cfg.get("baseline", {}).get("min_reference_years", 2)
+    method = cfg.get("baseline", {}).get("method", "seasonal_mean")
 
     shock_cfg = cfg["external_shocks"]
     crisis_years = set()
@@ -203,7 +228,7 @@ def build_recovery_targets(
             t_rec, baselines, censored = compute_recovery_months(
                 arrivals, year, month, K=K,
                 threshold=threshold, max_months=max_months,
-                crisis_years=crisis_years,
+                crisis_years=crisis_years, method=method,
             )
 
         records.append({

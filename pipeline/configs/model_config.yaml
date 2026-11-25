@@ -16,6 +16,7 @@ experiment:
 # R-03: drop events with fewer than min_reference_years non-crisis prior years
 baseline:
   min_reference_years: 2
+  method: seasonal_mean
 
 # R-07: exclude damage_usd_000 from DSI (74% missing; set true for 4-component sensitivity)
 dsi_include_damage: false
