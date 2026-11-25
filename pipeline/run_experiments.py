@@ -95,18 +95,39 @@ def _p(*args, **kwargs):
     sys.stdout.flush()
 
 
+def _get_regime(year: int, confounded_by: str = "") -> str:
+    """S-13: assign regime label to an event."""
+    if confounded_by and "civil_war_end" in str(confounded_by):
+        return "confounded_civil_war"
+    if 2019 <= year <= 2022:
+        return "easter_covid_crisis"
+    if year >= 2023:
+        return "post_crisis_recovery"
+    return "baseline"
+
+
 def _save_predictions(results: dict, df_events: pd.DataFrame, experiment_name: str, results_dir: Path):
-    """R-16: save per-event predictions for all models."""
+    """R-16 / S-13: save per-event predictions with regime column for all models."""
     rows = []
     for model_name, res in results.items():
         for idx, (yt, yp) in enumerate(zip(res["y_true"], res["y_pred"])):
-            event_id = str(df_events.iloc[idx]["disaster_id"]) if idx < len(df_events) else str(idx)
-            onset = str(df_events.iloc[idx]["start_date"]) if idx < len(df_events) else ""
+            if idx < len(df_events):
+                ev = df_events.iloc[idx]
+                event_id = str(ev.get("disaster_id", idx))
+                onset = str(ev.get("start_date", ""))
+                year = int(ev.get("start_year", 0))
+                confounded_by = str(ev.get("confounded_by", ""))
+                regime = _get_regime(year, confounded_by)
+            else:
+                event_id = str(idx)
+                onset = ""
+                regime = "unknown"
             rows.append({
                 "experiment": experiment_name,
                 "model": model_name,
                 "event_id": event_id,
                 "onset": onset,
+                "regime": regime,
                 "y_true": yt,
                 "y_pred": yp,
             })
@@ -330,6 +351,25 @@ def main():
 
     # ── Save results ───────────────────────────────────────────────────────
     all_results = pd.concat([summary_A, summary_B] + extra_summaries, ignore_index=True)
+    # S-13: add regime distribution columns
+    def _regime_counts(df_ev):
+        regs = df_ev.apply(
+            lambda r: _get_regime(int(r.get("start_year", 0)), str(r.get("confounded_by", ""))),
+            axis=1,
+        )
+        vc = regs.value_counts()
+        return {
+            "n_baseline": int(vc.get("baseline", 0)),
+            "n_easter_covid_crisis": int(vc.get("easter_covid_crisis", 0)),
+            "n_post_crisis_recovery": int(vc.get("post_crisis_recovery", 0)),
+            "n_confounded_civil_war": int(vc.get("confounded_civil_war", 0)),
+        }
+    rc_A = _regime_counts(df_A)
+    rc_B = _regime_counts(df_B)
+    for col, val in rc_A.items():
+        all_results.loc[all_results["Experiment"].str.startswith("ExpA"), col] = val
+    for col, val in rc_B.items():
+        all_results.loc[all_results["Experiment"].str.startswith("ExpB"), col] = val
     all_results.to_csv(results_dir / "experiment_results.csv", index=False)
     tests_df.to_csv(results_dir / "wilcoxon_tests.csv", index=False)
     if "s1_acc" in locals():
