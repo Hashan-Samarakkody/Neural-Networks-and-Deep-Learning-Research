@@ -4,6 +4,31 @@ Per-issue record of old vs new behaviour. Every change that alters a number is l
 
 ---
 
+## Revision 4 fixes (S-01 to S-20)
+
+Baseline for Revision 4: commit **e3225d1** (frozen run, branch `master`).
+Branch: `fix/revision-4`.
+
+| Issue | Commit | Summary |
+|-------|--------|---------|
+| S-01 | e49aaac | confounding_windows config, confounded_by column, 3 variants, confounding_sensitivity.csv |
+| S-02 | f693103 | seasonal_trend + yoy_growth baseline variants, baseline_method_comparison.csv |
+| S-03 | f6fd80c | persistence rule (default=1), depth/months_below/pre_event_ratio in event table |
+| S-04 | 47d2d5d | scikit-survival replaces lifelines; CoxPH + CoxnetAFT; C-index + IBS; survival_results.csv |
+| S-05 | e030382 | version assertion at startup; git commit hash in run_manifest.json; VERSION_SENSITIVITY.md |
+| S-06 | fb88545 | buffered LOOCV, LOYO, expanding-window; experiment label in results CSV |
+| S-07 | 08b980c | sign-flip permutation test + Holm correction replaces Wilcoxon |
+| S-08 | 3b87d2c | block_events param (overlapping blocks) replaces block_months bug |
+| S-09 | 1a81007 | feature_diagnostics.json; reference_fullsample.csv |
+| S-10 | cfbc853 | paper_numbers.json; make_paper_figures.py; paper_numbers.py |
+| S-11 | 95adae0 | 5 thresholds × 6 K × 2 persistence sensitivity grid; zero_share + n_censored |
+| S-12 | fa04b3f | AUC + majority_rate in two_stage_stage1.json; METHODS.md |
+| S-13 | 8926b3a | regime column (baseline/easter_covid_crisis/post_crisis/confounded) in predictions + results |
+| S-14 | 3318306 | supplementary_event_table missing columns + dtii_report.csv |
+| S-15 | c50f6b5 | event_flow: raw_emdat_records=86; full 86→80→65→60 flow; arithmetic assertion |
+
+---
+
 ## R-01 — Fold-safe preprocessing
 
 **Commit:** 47d12d1
