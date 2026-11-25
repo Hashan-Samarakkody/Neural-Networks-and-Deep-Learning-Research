@@ -74,7 +74,7 @@ from train import (
 )
 from evaluate import (
     summarize_experiment, conformal_pi_from_loocv, wilcoxon_comparison,
-    target_distribution_summary,
+    target_distribution_summary, holm_correction,
 )
 from explainability import run_shap_analysis
 from confounding import flag_confounded_events, run_confounding_variants
@@ -324,8 +324,15 @@ def main():
                 "XGBoost", opponent,
             )
             tests.append(w)
-            sig = "YES" if w["significant_at_0.05"] else "NO"
-            _p(f"      XGBoost vs {opponent}: p={w['p_value']} {sig}")
+            _p(f"      XGBoost vs {opponent}: p_raw={w['p_raw']}")
+    # S-07: apply Holm correction across all tests
+    p_raws = [t["p_raw"] for t in tests]
+    p_holms = holm_correction(p_raws)
+    for t, ph in zip(tests, p_holms):
+        t["p_holm"] = round(ph, 6)
+        t["significant_at_0.05"] = bool(ph < 0.05)
+        sig = "YES" if t["significant_at_0.05"] else "NO"
+        _p(f"      (Holm) XGBoost vs {t['model_b']}: p_raw={t['p_raw']} p_holm={t['p_holm']} {sig}")
     tests_df = pd.DataFrame(tests)
 
     # ── Save results ───────────────────────────────────────────────────────

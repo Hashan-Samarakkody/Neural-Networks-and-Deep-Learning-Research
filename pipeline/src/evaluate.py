@@ -150,6 +150,51 @@ def conformal_pi_from_loocv(
     }
 
 
+def sign_flip_permutation_test(
+    y_true: np.ndarray,
+    pred_a: np.ndarray,
+    pred_b: np.ndarray,
+    n_permutations: int = 10000,
+    seed: int = 42,
+) -> tuple[float, float]:
+    """
+    S-07: Sign-flip permutation test for paired absolute errors.
+    H0: median(|e_A| - |e_B|) = 0.
+    Returns (observed_stat, p_value).
+    """
+    rng = np.random.default_rng(seed)
+    ae_a = np.abs(y_true - pred_a)
+    ae_b = np.abs(y_true - pred_b)
+    diffs = ae_a - ae_b
+    n_nonzero = int(np.sum(diffs != 0))
+    if n_nonzero == 0:
+        return 0.0, 1.0
+
+    obs = float(np.mean(diffs))
+    count = 0
+    for _ in range(n_permutations):
+        signs = rng.choice([-1.0, 1.0], size=len(diffs))
+        perm_stat = float(np.mean(diffs * signs))
+        if abs(perm_stat) >= abs(obs):
+            count += 1
+    p = (count + 1) / (n_permutations + 1)
+    return obs, float(p)
+
+
+def holm_correction(p_values: list[float]) -> list[float]:
+    """Holm-Bonferroni step-down correction. Returns adjusted p-values."""
+    n = len(p_values)
+    indexed = sorted(enumerate(p_values), key=lambda x: x[1])
+    p_adj = [None] * n
+    running_max = 0.0
+    for rank, (orig_i, p) in enumerate(indexed):
+        adjusted = p * (n - rank)
+        adjusted = min(adjusted, 1.0)
+        running_max = max(running_max, adjusted)
+        p_adj[orig_i] = running_max
+    return p_adj
+
+
 def wilcoxon_comparison(
     y_true: np.ndarray,
     pred_a: np.ndarray,
@@ -158,29 +203,27 @@ def wilcoxon_comparison(
     model_b: str,
 ) -> dict:
     """
-    Wilcoxon signed-rank test comparing absolute errors of two models.
-    H0: median(|e_A| - |e_B|) = 0
+    S-07: Sign-flip permutation test (replaces Wilcoxon) + Holm correction applied upstream.
+    Returns raw p; caller applies Holm across all tests.
     """
-    ae_a = np.abs(y_true - pred_a)
-    ae_b = np.abs(y_true - pred_b)
+    ae_a = np.abs(np.array(y_true, dtype=float) - np.array(pred_a, dtype=float))
+    ae_b = np.abs(np.array(y_true, dtype=float) - np.array(pred_b, dtype=float))
     diffs = ae_a - ae_b
-    if np.all(diffs == 0):
-        return {
-            "test": "Wilcoxon signed-rank",
-            "model_a": model_a,
-            "model_b": model_b,
-            "statistic": 0.0,
-            "p_value": 1.0,
-            "significant_at_0.05": False,
-        }
-    stat, p = stats.wilcoxon(diffs, alternative="two-sided", zero_method="wilcox")
+    n_nonzero = int(np.sum(diffs != 0))
+
+    _, p_raw = sign_flip_permutation_test(
+        np.array(y_true, dtype=float),
+        np.array(pred_a, dtype=float),
+        np.array(pred_b, dtype=float),
+    )
     return {
-        "test": "Wilcoxon signed-rank",
+        "method": "sign_flip_permutation",
         "model_a": model_a,
         "model_b": model_b,
-        "statistic": round(float(stat), 4),
-        "p_value": round(float(p), 6),
-        "significant_at_0.05": bool(p < 0.05),
+        "p_raw": round(float(p_raw), 6),
+        "p_holm": None,
+        "n_nonzero_diff": n_nonzero,
+        "significant_at_0.05": False,
     }
 
 
