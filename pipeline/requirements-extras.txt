@@ -1,0 +1,6 @@
+# Optional dependencies for survival analysis (R-10).
+# Install after the core requirements:
+#   pip install -r requirements-extras.txt
+# Note: lifelines may require numpy<2.0. If using numpy==2.0.x, try:
+#   pip install "numpy<2.0" lifelines
+lifelines>=0.27.0
