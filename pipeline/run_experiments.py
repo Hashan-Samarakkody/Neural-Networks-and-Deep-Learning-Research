@@ -81,7 +81,7 @@ from confounding import flag_confounded_events, run_confounding_variants
 from supplementary import (
     export_event_level_table, export_correlation_matrix,
     export_target_distribution_plot, export_rq_summary,
-    export_hazard_type_performance,
+    export_hazard_type_performance, export_dtii_report,
 )
 
 
@@ -392,6 +392,7 @@ def main():
     _p("\n[SUPP] Supplementary outputs...")
     X_df = pd.DataFrame(X_ref, columns=FEATURE_COLS)
     export_event_level_table(df_B, X_df, results_dir)
+    export_dtii_report(df_B, results_dir)
     export_correlation_matrix(X_df, results_dir, figures_dir)
     export_target_distribution_plot(y_B, figures_dir, dist)
 

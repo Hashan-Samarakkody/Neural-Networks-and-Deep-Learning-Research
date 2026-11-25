@@ -47,6 +47,10 @@ def export_event_level_table(
             "disaster_id", "start_year", "start_month", "disaster_type", "disaster_subtype",
             "location", "deaths", "total_affected", "damage_usd_000", "duration_days",
             "n_events_clustered", "pre_disaster_baseline", "recovery_months", "is_right_censored",
+            # S-14: additional columns
+            "confounded_by", "depth", "months_below_threshold", "pre_event_ratio",
+            "n_reference_years_min", "damage_missing",
+            "dtii_rule", "matched_district",
         ] if c in df_events.columns
     ]
 
@@ -198,6 +202,27 @@ def export_target_distribution_plot(
     fig.savefig(figures_dir / "target_distribution.png", format="png", dpi=300, bbox_inches="tight")
     plt.close(fig)
     print("      Target distribution plot exported.")
+
+
+def export_dtii_report(
+    df_events: pd.DataFrame,
+    results_dir: Path,
+) -> None:
+    """S-14: Export DTII per-event breakdown."""
+    results_dir = Path(results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    dtii_cols = [c for c in [
+        "disaster_id", "start_year", "start_month", "disaster_type",
+        "location", "matched_district", "dtii_rule", "TWDI",
+    ] if c in df_events.columns]
+
+    if not dtii_cols:
+        return
+
+    df_dtii = df_events[dtii_cols].copy()
+    df_dtii.to_csv(results_dir / "dtii_report.csv", index=False)
+    print(f"      DTII report: {len(df_dtii)} rows -> dtii_report.csv")
 
 
 def export_rq_summary(
