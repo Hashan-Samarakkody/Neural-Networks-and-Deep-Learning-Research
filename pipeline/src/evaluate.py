@@ -36,31 +36,34 @@ def block_bootstrap_ci(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     n_bootstrap: int = 1000,
-    block_months: int = 12,
+    block_events: int = 6,
     seed: int = 42,
     onsets: np.ndarray | None = None,
 ) -> dict:
     """
-    R-11: Moving-block bootstrap CI for MAE, RMSE, R².
+    S-08: Moving-block bootstrap CI for MAE, RMSE, R².
 
-    Events are ordered by onset (or by index if onsets is None).
-    Contiguous blocks of `block_months` worth of events are resampled.
-    Accounts for temporal dependence between nearby events.
+    block_events: number of consecutive events per block (not months).
+    Contiguous overlapping blocks of block_events events are resampled
+    to account for temporal dependence between nearby events.
+    Default block_events=6 (~12 months for typical event spacing).
     """
     rng = np.random.default_rng(seed)
     y_true = np.array(y_true, dtype=float)
     y_pred = np.array(y_pred, dtype=float)
     n = len(y_true)
 
-    # Build blocks: group indices into windows of block_months events
-    # Simple approach: fixed-size blocks of ceil(n / (n/block_months)) events
-    block_size = max(1, int(np.ceil(n / max(n / block_months, 1))))
-    blocks = [list(range(i, min(i + block_size, n))) for i in range(0, n, block_size)]
+    block_size = max(1, min(block_events, n))
+    # Overlapping blocks: start indices 0..n-block_size
+    n_possible = n - block_size + 1
+    blocks = [list(range(i, i + block_size)) for i in range(n_possible)]
     n_blocks = len(blocks)
+    # Number of blocks to draw so expected resample length >= n
+    n_draw = max(1, int(np.ceil(n / block_size)))
 
     boot_mae, boot_rmse, boot_r2 = [], [], []
     for _ in range(n_bootstrap):
-        chosen = rng.integers(0, n_blocks, size=n_blocks)
+        chosen = rng.integers(0, n_blocks, size=n_draw)
         idx = np.concatenate([blocks[c] for c in chosen])[:n]
         yt, yp = y_true[idx], y_pred[idx]
         boot_mae.append(mean_absolute_error(yt, yp))
@@ -77,8 +80,8 @@ def block_bootstrap_ci(
         "MAE_95CI_block_bootstrap": ci(boot_mae),
         "RMSE_95CI_block_bootstrap": ci(boot_rmse),
         "R2_95CI_block_bootstrap": ci(boot_r2) if boot_r2 else (None, None),
-        "bootstrap_type": "block",
-        "block_months": block_months,
+        "bootstrap_type": "overlapping_block",
+        "block_events": block_events,
         "n_bootstrap": n_bootstrap,
     }
 
