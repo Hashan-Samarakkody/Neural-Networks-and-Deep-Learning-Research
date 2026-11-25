@@ -249,6 +249,54 @@ def run_chronological_split(
     return results
 
 
+def run_multisplit(
+    df: pd.DataFrame,
+    splits: list,
+    cfg: dict,
+    n_inner_splits: int = 5,
+) -> dict:
+    """
+    S-06: Generic multi-split runner for buffered LOOCV, LOYO, expanding-window.
+
+    splits: list of (train_idx, test_idx) arrays.
+    Returns {model_name: {"y_true", "y_pred", "best_params"}}.
+    """
+    from preprocess import FeatureBuilder
+    from feature_engineering import FEATURE_COLS
+    from two_stage_model import _fit as ts_fit
+
+    model_names = list(MODEL_REGISTRY.keys()) + ["TwoStage"]
+    results = {n: {"y_true": [], "y_pred": [], "best_params": []} for n in model_names}
+
+    for fold_i, (train_idx, test_idx) in enumerate(splits):
+        df_tr = df.iloc[train_idx]
+        df_te = df.iloc[test_idx]
+
+        fb = FeatureBuilder(cfg)
+        fb.fit(df_tr)
+        X_tr = fb.transform(df_tr)[FEATURE_COLS].values
+        X_te = fb.transform(df_te)[FEATURE_COLS].values
+        y_tr = df_tr["recovery_months"].values
+        y_te = df_te["recovery_months"].values
+
+        for name in MODEL_REGISTRY:
+            model, params, scaler = tune_model(
+                name, X_tr, y_tr, cfg,
+                n_inner_splits=min(n_inner_splits, max(2, len(train_idx) - 1)),
+            )
+            pred = predict_clipped(model, scaler, X_te)
+            results[name]["y_true"].extend(y_te.tolist())
+            results[name]["y_pred"].extend(pred.tolist())
+            results[name]["best_params"].append(params)
+
+        ts_sc, ts_clf, ts_reg = ts_fit(X_tr, y_tr)
+        ts_pred = _predict_ts(ts_sc, ts_clf, ts_reg, X_te)
+        results["TwoStage"]["y_true"].extend(y_te.tolist())
+        results["TwoStage"]["y_pred"].extend(ts_pred.tolist())
+
+    return results
+
+
 def naive_baselines_loocv(y: np.ndarray, df: pd.DataFrame = None) -> dict:
     """
     Naive baselines under LOOCV.

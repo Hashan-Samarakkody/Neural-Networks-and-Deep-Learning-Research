@@ -64,9 +64,12 @@ from data_loader import load_config, load_arrivals, load_emdat, validate_data
 from baseline_counterfactual import build_recovery_targets
 from feature_engineering import FEATURE_COLS
 from preprocess import FeatureBuilder
-from validation import chronological_split
+from validation import (
+    chronological_split, buffered_loocv_split,
+    leave_one_year_out_split, expanding_window_split,
+)
 from train import (
-    run_loocv, run_chronological_split,
+    run_loocv, run_chronological_split, run_multisplit,
     naive_baselines_loocv, naive_baselines_split,
 )
 from evaluate import (
@@ -235,6 +238,31 @@ def main():
     # R-16: save per-event predictions
     _save_predictions(results_A, df_A, "ExpA_LOOCV", results_dir)
 
+    # ── S-06: Additional validation schemes ───────────────────────────────
+    _p("\n[VAL] Additional validation schemes (buffered LOOCV / LOYO / expanding window)...")
+    extra_summaries = []
+    try:
+        buf_splits = buffered_loocv_split(df_A, buffer_months=12)
+        _p(f"      Buffered LOOCV: {len(buf_splits)} folds")
+        res_buf = run_multisplit(df_A, buf_splits, cfg)
+        extra_summaries.append(summarize_experiment(res_buf, "ExpA_BufferedLOOCV"))
+    except Exception as e:
+        _p(f"      [WARN] Buffered LOOCV skipped: {e}")
+    try:
+        loyo_splits = leave_one_year_out_split(df_A)
+        _p(f"      LOYO: {len(loyo_splits)} folds")
+        res_loyo = run_multisplit(df_A, loyo_splits, cfg)
+        extra_summaries.append(summarize_experiment(res_loyo, "ExpA_LOYO"))
+    except Exception as e:
+        _p(f"      [WARN] LOYO skipped: {e}")
+    try:
+        ew_splits = expanding_window_split(df_A)
+        _p(f"      Expanding window: {len(ew_splits)} folds")
+        res_ew = run_multisplit(df_A, ew_splits, cfg)
+        extra_summaries.append(summarize_experiment(res_ew, "ExpA_ExpandingWindow"))
+    except Exception as e:
+        _p(f"      [WARN] Expanding window skipped: {e}")
+
     # ── 5. Experiment B (chronological split) ──────────────────────────────
     _p("\n[5/6] Experiment B -- Chronological split (train <=2018, test >=2019)...")
     X_dummy = pd.DataFrame(np.zeros((len(df_B), 1)))
@@ -301,7 +329,7 @@ def main():
     tests_df = pd.DataFrame(tests)
 
     # ── Save results ───────────────────────────────────────────────────────
-    all_results = pd.concat([summary_A, summary_B], ignore_index=True)
+    all_results = pd.concat([summary_A, summary_B] + extra_summaries, ignore_index=True)
     all_results.to_csv(results_dir / "experiment_results.csv", index=False)
     tests_df.to_csv(results_dir / "wilcoxon_tests.csv", index=False)
     if "s1_acc" in dir():
