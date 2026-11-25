@@ -28,23 +28,36 @@ def compute_metrics(y_true: list | np.ndarray, y_pred: list | np.ndarray) -> dic
     return {"MAE": round(mae, 4), "RMSE": round(rmse, 4), "R2": round(r2, 4)}
 
 
-def compute_metrics_with_ci(
-    y_true: list | np.ndarray,
-    y_pred: list | np.ndarray,
+def block_bootstrap_ci(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
     n_bootstrap: int = 1000,
+    block_months: int = 12,
     seed: int = 42,
+    onsets: np.ndarray | None = None,
 ) -> dict:
     """
-    Compute MAE, RMSE, R² with 95% bootstrap confidence intervals.
+    R-11: Moving-block bootstrap CI for MAE, RMSE, R².
+
+    Events are ordered by onset (or by index if onsets is None).
+    Contiguous blocks of `block_months` worth of events are resampled.
+    Accounts for temporal dependence between nearby events.
     """
     rng = np.random.default_rng(seed)
     y_true = np.array(y_true, dtype=float)
     y_pred = np.array(y_pred, dtype=float)
     n = len(y_true)
 
+    # Build blocks: group indices into windows of block_months events
+    # Simple approach: fixed-size blocks of ceil(n / (n/block_months)) events
+    block_size = max(1, int(np.ceil(n / max(n / block_months, 1))))
+    blocks = [list(range(i, min(i + block_size, n))) for i in range(0, n, block_size)]
+    n_blocks = len(blocks)
+
     boot_mae, boot_rmse, boot_r2 = [], [], []
     for _ in range(n_bootstrap):
-        idx = rng.integers(0, n, size=n)
+        chosen = rng.integers(0, n_blocks, size=n_blocks)
+        idx = np.concatenate([blocks[c] for c in chosen])[:n]
         yt, yp = y_true[idx], y_pred[idx]
         boot_mae.append(mean_absolute_error(yt, yp))
         boot_rmse.append(np.sqrt(mean_squared_error(yt, yp)))
@@ -57,9 +70,35 @@ def compute_metrics_with_ci(
     base = compute_metrics(y_true, y_pred)
     return {
         **base,
-        "MAE_95CI": ci(boot_mae),
-        "RMSE_95CI": ci(boot_rmse),
-        "R2_95CI": ci(boot_r2) if boot_r2 else (None, None),
+        "MAE_95CI_block_bootstrap": ci(boot_mae),
+        "RMSE_95CI_block_bootstrap": ci(boot_rmse),
+        "R2_95CI_block_bootstrap": ci(boot_r2) if boot_r2 else (None, None),
+        "bootstrap_type": "block",
+        "block_months": block_months,
+        "n_bootstrap": n_bootstrap,
+    }
+
+
+def compute_metrics_with_ci(
+    y_true: list | np.ndarray,
+    y_pred: list | np.ndarray,
+    n_bootstrap: int = 1000,
+    seed: int = 42,
+) -> dict:
+    """
+    Compute MAE, RMSE, R² with 95% block bootstrap confidence intervals (R-11).
+    """
+    rng = np.random.default_rng(seed)
+    y_true = np.array(y_true, dtype=float)
+    y_pred = np.array(y_pred, dtype=float)
+
+    block_result = block_bootstrap_ci(y_true, y_pred, n_bootstrap=n_bootstrap, seed=seed)
+    base = compute_metrics(y_true, y_pred)
+    return {
+        **base,
+        "MAE_95CI": block_result["MAE_95CI_block_bootstrap"],
+        "RMSE_95CI": block_result["RMSE_95CI_block_bootstrap"],
+        "R2_95CI": block_result["R2_95CI_block_bootstrap"],
     }
 
 
