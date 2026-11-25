@@ -168,6 +168,7 @@ def main():
     fb_ref = FeatureBuilder(cfg)
     fb_ref.fit(df_with_targets)
     df_feat_ref = fb_ref.transform(df_with_targets)
+    df_feat_ref.to_csv(results_dir / "reference_fullsample.csv", index=False)
     X_ref = df_feat_ref[FEATURE_COLS].values
     y_ref = df_with_targets["recovery_months"].values
     _p(f"      Reference feature matrix shape: {X_ref.shape}")
@@ -368,6 +369,35 @@ def main():
             df_A, np.array(xgb_a["y_true"]), np.array(xgb_a["y_pred"]),
             results_dir, "ExpA_LOOCV",
         )
+
+    # ── S-09: Feature diagnostics for Exp B ───────────────────────────────
+    _p("\n[DIAG] Feature diagnostics (Exp B fold-safe vs full-sample reference)...")
+    try:
+        fb_B_diag = results_B.get("XGBoost", {}).get("feature_builder", fb_ref)
+        X_B_full = fb_ref.transform(df_B)[FEATURE_COLS].values
+        X_B_train_diag = fb_B_diag.transform(df_B.iloc[train_idx])[FEATURE_COLS].values
+        diag = {
+            "reference_fullsample_shape": list(X_B_full.shape),
+            "fold_train_shape": list(X_B_train_diag.shape),
+            "feature_means_reference": {
+                f: round(float(np.mean(X_B_full[:, i])), 4)
+                for i, f in enumerate(FEATURE_COLS)
+            },
+            "feature_means_fold_train": {
+                f: round(float(np.mean(X_B_train_diag[:, i])), 4)
+                for i, f in enumerate(FEATURE_COLS)
+            },
+            "feature_std_reference": {
+                f: round(float(np.std(X_B_full[:, i])), 4)
+                for i, f in enumerate(FEATURE_COLS)
+            },
+            "note": "fold_train uses FeatureBuilder fit on train_idx only (fold-safe); reference uses all events",
+        }
+        with open(results_dir / "feature_diagnostics.json", "w") as f:
+            json.dump(diag, f, indent=2)
+        _p("      feature_diagnostics.json written.")
+    except Exception as e:
+        _p(f"      [WARN] Feature diagnostics skipped: {e}")
 
     shap_df = None
     xgb_model_B = results_B.get("XGBoost", {}).get("model", None)
