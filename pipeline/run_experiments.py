@@ -60,7 +60,7 @@ def _get_commit_hash() -> str:
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from data_loader import load_config, load_arrivals, load_emdat, validate_data
+from data_loader import load_config, load_arrivals, load_emdat, validate_data, _EMDAT_FLOW
 from baseline_counterfactual import build_recovery_targets
 from feature_engineering import FEATURE_COLS
 from preprocess import FeatureBuilder
@@ -210,10 +210,11 @@ def main():
     _p(f"      Experiment A (pure natural hazards): N = {len(df_A)}")
     _p(f"      Experiment B (all events incl. shocks): N = {len(df_B)}")
 
-    # R-04: event-flow table
+    # S-15 / R-04: event-flow table with correct raw count
     event_flow = {
-        "raw_emdat_records": len(emdat),
-        "physical_disasters_after_cluster": len(emdat),
+        "raw_emdat_records": _EMDAT_FLOW.get("raw_emdat_records", len(emdat)),
+        "physical_disasters_before_cluster": _EMDAT_FLOW.get("physical_disasters_before_cluster", len(emdat)),
+        "physical_disasters_after_cluster": _EMDAT_FLOW.get("physical_disasters_after_cluster", len(emdat)),
         "events_baseline_insufficient": int(n_insufficient),
         "events_valid_target": dist["n_total"],
         "events_right_censored": dist["n_right_censored_12"],
@@ -222,6 +223,14 @@ def main():
         "exp_A_N": int(len(df_A)),
         "exp_B_N": int(len(df_B)),
     }
+    # S-15: arithmetic assertion on event flow
+    _n_clustered = event_flow["physical_disasters_after_cluster"]
+    _n_valid = event_flow["events_valid_target"]
+    _n_insuff = event_flow["events_baseline_insufficient"]
+    assert _n_clustered == _n_valid + _n_insuff, (
+        f"Event flow arithmetic error: {_n_clustered} clustered != "
+        f"{_n_valid} valid + {_n_insuff} insufficient"
+    )
 
     # ── 4. Experiment A (LOOCV) ────────────────────────────────────────────
     _p("\n[4/6] Experiment A -- LOOCV on pure natural hazards...")

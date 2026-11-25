@@ -16,6 +16,8 @@ import yaml
 
 warnings.filterwarnings("ignore")
 
+_EMDAT_FLOW: dict = {}
+
 
 def load_config(config_path: str | Path) -> dict:
     with open(config_path, "r") as f:
@@ -90,8 +92,11 @@ def load_emdat(path: str | Path, cfg: dict) -> pd.DataFrame:
     df["start_month"] = df["start_month"].fillna(1).astype("Int64")
     df = df[df["start_year"].notna() & (df["start_year"] >= 2000)]
 
+    n_raw = len(df)
+
     physical_types = set(cfg["hazard_taxonomy"]["physical_types"])
     df = df[df["disaster_type"].isin(physical_types)].copy()
+    n_physical = len(df)
 
     df["deaths"] = df["deaths"].fillna(0)
     df["injured"] = df["injured"].fillna(0)
@@ -103,6 +108,12 @@ def load_emdat(path: str | Path, cfg: dict) -> pd.DataFrame:
     df = _compute_duration(df)
     df = _cluster_compound_events(df, cfg["hazard_taxonomy"]["compound_cluster_days"])
     df = df.reset_index(drop=True)
+    n_clustered = len(df)
+
+    _EMDAT_FLOW["raw_emdat_records"] = n_raw
+    _EMDAT_FLOW["physical_disasters_before_cluster"] = n_physical
+    _EMDAT_FLOW["physical_disasters_after_cluster"] = n_clustered
+
     return df
 
 
