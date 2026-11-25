@@ -474,6 +474,7 @@ def main():
             crisis_years=crisis_years,
             results_dir=results_dir,
             seed=SEED,
+            persistence_values=sens_cfg.get("persistence_values", [1]),
         )
         _p(f"      Sensitivity grid: {len(sens_df)} combinations.")
     except Exception as e:
