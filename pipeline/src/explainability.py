@@ -179,3 +179,126 @@ def run_shap_analysis(
         shap_values, feature_names, results_dir, experiment_name, model_name
     )
     return importance_df
+
+
+# ── R-19: permutation importance, grouped importance, VIF ────────────────────
+
+# Correlated feature groups for grouped importance
+_FEATURE_GROUPS = {
+    "economy": ["Economic_Condition_Index", "gdp_growth", "global_tourism_idx"],
+    "hazard": ["DSI", "TWDI"],
+    "seasonality": ["Season_sin", "Season_cos"],
+    "shock": ["external_shock_flag"],
+}
+
+
+def permutation_importance(
+    model,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    feature_names: list,
+    n_repeats: int = 30,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """
+    R-19: Permutation importance on held-out test set.
+    Drop in MAE when feature is randomly shuffled.
+    """
+    from sklearn.metrics import mean_absolute_error as _mae
+
+    rng = np.random.default_rng(seed)
+    base_mae = _mae(y_test, model.predict(X_test))
+
+    rows = []
+    for i, feat in enumerate(feature_names):
+        deltas = []
+        for _ in range(n_repeats):
+            X_perm = X_test.copy()
+            X_perm[:, i] = rng.permutation(X_perm[:, i])
+            perm_mae = _mae(y_test, model.predict(X_perm))
+            deltas.append(perm_mae - base_mae)
+        rows.append({
+            "Feature": feat,
+            "Display_Name": FEATURE_DISPLAY_NAMES.get(feat, feat),
+            "mean_mae_increase": round(float(np.mean(deltas)), 4),
+            "std_mae_increase": round(float(np.std(deltas)), 4),
+        })
+
+    df = pd.DataFrame(rows).sort_values("mean_mae_increase", ascending=False).reset_index(drop=True)
+    df["Rank"] = range(1, len(df) + 1)
+    return df
+
+
+def grouped_importance(
+    perm_df: pd.DataFrame,
+    feature_groups: dict | None = None,
+) -> pd.DataFrame:
+    """
+    R-19: Sum permutation importance within predefined correlated groups.
+    """
+    groups = feature_groups or _FEATURE_GROUPS
+    rows = []
+    for group_name, features in groups.items():
+        subset = perm_df[perm_df["Feature"].isin(features)]
+        rows.append({
+            "group": group_name,
+            "features": ", ".join(features),
+            "sum_mean_mae_increase": round(float(subset["mean_mae_increase"].sum()), 4),
+            "n_features": len(subset),
+        })
+    return pd.DataFrame(rows).sort_values("sum_mean_mae_increase", ascending=False)
+
+
+def compute_vif(X: np.ndarray, feature_names: list) -> pd.DataFrame:
+    """
+    R-19: Variance Inflation Factor for each feature.
+    VIF > 10 indicates severe multicollinearity.
+    """
+    from sklearn.linear_model import LinearRegression
+
+    n_features = X.shape[1]
+    vif_values = []
+    for i in range(n_features):
+        y_i = X[:, i]
+        X_others = np.delete(X, i, axis=1)
+        if X_others.shape[1] == 0 or len(y_i) <= X_others.shape[1]:
+            vif_values.append(float("nan"))
+            continue
+        lr = LinearRegression().fit(X_others, y_i)
+        ss_res = np.sum((y_i - lr.predict(X_others)) ** 2)
+        ss_tot = np.sum((y_i - y_i.mean()) ** 2)
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+        vif = 1 / (1 - r2) if r2 < 1 else float("inf")
+        vif_values.append(round(float(vif), 2))
+
+    return pd.DataFrame({
+        "Feature": feature_names,
+        "Display_Name": [FEATURE_DISPLAY_NAMES.get(f, f) for f in feature_names],
+        "VIF": vif_values,
+    }).sort_values("VIF", ascending=False)
+
+
+def run_r19_analysis(
+    model,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    X_train: np.ndarray,
+    feature_names: list,
+    results_dir: str | Path,
+    experiment_name: str,
+    model_name: str,
+) -> None:
+    """
+    R-19: Run permutation importance, grouped importance, and VIF; save CSVs.
+    """
+    results_dir = Path(results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    perm_df = permutation_importance(model, X_test, y_test, feature_names)
+    perm_df.to_csv(results_dir / f"permutation_importance_{experiment_name}_{model_name}.csv", index=False)
+
+    group_df = grouped_importance(perm_df)
+    group_df.to_csv(results_dir / "grouped_importance.csv", index=False)
+
+    vif_df = compute_vif(X_train, feature_names)
+    vif_df.to_csv(results_dir / "vif.csv", index=False)
