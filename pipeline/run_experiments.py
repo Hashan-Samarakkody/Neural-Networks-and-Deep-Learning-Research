@@ -460,6 +460,27 @@ def main():
 
     export_rq_summary(dist, summary_A, summary_B, tests_df, shap_df, results_dir)
 
+    # ── S-18: Permutation importance, VIF, grouped importance, ablation ───
+    _p("\n[IMP] S-18: permutation importance, VIF, grouped importance, ablation...")
+    try:
+        from explainability import run_r19_analysis, run_ablation_no_index
+        xgb_model_A_last = None
+        # Use Exp B XGBoost for permutation importance (has held-out test set)
+        if xgb_model_B is not None:
+            fb_B_imp = results_B.get("XGBoost", {}).get("feature_builder", fb_ref)
+            X_B_te = fb_B_imp.transform(df_B.iloc[test_idx])[FEATURE_COLS].values
+            y_B_te = y_B[test_idx]
+            X_B_tr = fb_B_imp.transform(df_B.iloc[train_idx])[FEATURE_COLS].values
+            run_r19_analysis(
+                xgb_model_B, X_B_te, y_B_te, X_B_tr, FEATURE_COLS,
+                results_dir, "ExpB", "XGBoost",
+            )
+            _p("      permutation_importance_ExpB_XGBoost.csv, grouped_importance.csv, vif.csv written.")
+        abl_df = run_ablation_no_index(df_A, cfg, results_dir, seed=SEED)
+        _p(f"      ablation_no_index.csv: MAE={abl_df['MAE'].iloc[0]}")
+    except Exception as e:
+        _p(f"      [WARN] S-18 analysis skipped: {e}")
+
     # ── S-02: Baseline method comparison ──────────────────────────────────
     _p("\n[BASE] Baseline method comparison (seasonal_mean / seasonal_trend / yoy_growth)...")
     try:

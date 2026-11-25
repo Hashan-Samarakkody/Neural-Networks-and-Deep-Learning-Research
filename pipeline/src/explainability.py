@@ -302,3 +302,50 @@ def run_r19_analysis(
 
     vif_df = compute_vif(X_train, feature_names)
     vif_df.to_csv(results_dir / "vif.csv", index=False)
+
+
+def run_ablation_no_index(
+    df_A: "pd.DataFrame",
+    cfg: dict,
+    results_dir: "Path",
+    seed: int = 42,
+) -> "pd.DataFrame":
+    """
+    S-18: Ablation study removing DSI and TWDI (the index features).
+    Runs LOOCV with XGBoost on reduced feature set.
+    """
+    from sklearn.model_selection import LeaveOneOut
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+    import xgboost as xgb
+    from preprocess import FeatureBuilder
+    from feature_engineering import FEATURE_COLS
+
+    no_index_cols = [f for f in FEATURE_COLS if f not in ("DSI", "TWDI")]
+    n = len(df_A)
+    loo = LeaveOneOut()
+    preds, trues = [], []
+    for tr, te in loo.split(np.arange(n)):
+        fb = FeatureBuilder(cfg)
+        df_tr = df_A.iloc[tr]
+        df_te = df_A.iloc[te]
+        fb.fit(df_tr)
+        X_tr = fb.transform(df_tr)[no_index_cols].values
+        X_te = fb.transform(df_te)[no_index_cols].values
+        y_tr = df_tr["recovery_months"].values
+        m = xgb.XGBRegressor(random_state=seed, verbosity=0, nthread=1)
+        m.fit(X_tr, y_tr)
+        preds.append(float(np.clip(m.predict(X_te)[0], 0, 12)))
+        trues.append(float(df_A.iloc[te[0]]["recovery_months"]))
+
+    yt, yp = np.array(trues), np.array(preds)
+    df_out = pd.DataFrame([{
+        "experiment": "ExpA_LOOCV_no_index",
+        "features_removed": "DSI,TWDI",
+        "n_features": len(no_index_cols),
+        "MAE": round(float(mean_absolute_error(yt, yp)), 4),
+        "RMSE": round(float(np.sqrt(mean_squared_error(yt, yp))), 4),
+        "R2": round(float(r2_score(yt, yp)), 4),
+    }])
+    Path(results_dir).mkdir(parents=True, exist_ok=True)
+    df_out.to_csv(Path(results_dir) / "ablation_no_index.csv", index=False)
+    return df_out
