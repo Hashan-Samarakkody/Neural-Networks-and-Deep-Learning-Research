@@ -1,9 +1,9 @@
-test,model_a,model_b,statistic,p_value,significant_at_0.05
-Wilcoxon signed-rank,XGBoost,RandomForest,269.0,0.036369,True
-Wilcoxon signed-rank,XGBoost,Ridge,234.0,0.000569,True
-Wilcoxon signed-rank,XGBoost,SVR,297.0,0.286461,False
-Wilcoxon signed-rank,XGBoost,TwoStage,139.0,0.032678,True
-Wilcoxon signed-rank,XGBoost,NaiveMean,200.0,0.000108,True
-Wilcoxon signed-rank,XGBoost,NaiveMedian,189.0,0.247601,False
-Wilcoxon signed-rank,XGBoost,NaiveLastKnown,,,False
-Wilcoxon signed-rank,XGBoost,NaivePrevious_Oracle,239.0,0.860004,False
+method,model_a,model_b,p_raw,p_holm,n_nonzero_diff,significant_at_0.05
+sign_flip_permutation,XGBoost,RandomForest,0.115388,0.57694,41,False
+sign_flip_permutation,XGBoost,Ridge,0.0004,0.0024,46,True
+sign_flip_permutation,XGBoost,SVR,0.483352,1.0,38,False
+sign_flip_permutation,XGBoost,TwoStage,0.434657,1.0,31,False
+sign_flip_permutation,XGBoost,NaiveMean,0.0001,0.0008,46,True
+sign_flip_permutation,XGBoost,NaiveMedian,0.569243,1.0,31,False
+sign_flip_permutation,XGBoost,NaiveLastKnown,0.0001,0.0008,33,True
+sign_flip_permutation,XGBoost,NaivePrevious_Oracle,0.394061,1.0,31,False

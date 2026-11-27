@@ -1,16 +1,16 @@
 {
-  "commit": "see git log",
+  "commit": "b4ee6f1c8390fc41778a0cd867abd9f652b90f32",
   "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
   "platform": "Windows-11-10.0.26200-SP0",
   "seed": 42,
   "config_path": "F:\\Neural Networks and Deep Learning Research\\pipeline\\configs\\model_config.yaml",
-  "run_start_utc": "2026-11-25T09:53:53.614861",
-  "run_end_utc": "2026-11-25T10:14:22.560242",
-  "run_duration_seconds": 1228.945381,
+  "run_start_utc": "2026-11-25T16:21:08.479132",
+  "run_end_utc": "2026-11-27T05:51:10.590657",
+  "run_duration_seconds": 135002.111525,
   "packages": {
     "pandas": "2.2.2",
     "numpy": "2.2.6",
-    "scikit-learn": "1.5.2",
+    "scikit-learn": "1.9.1",
     "xgboost": "3.4.1",
     "shap": "0.52.0",
     "scipy": "1.14.1"

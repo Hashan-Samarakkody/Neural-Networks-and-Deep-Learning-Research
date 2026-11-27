@@ -1,0 +1,4 @@
+variant,n_events,MAE,RMSE,R2,note
+all,46,1.2399,2.3367,0.1108,
+excluded,37,0.4574,1.1355,0.5092,
+flagged_only,9,4.5829,5.2982,-1.0337,

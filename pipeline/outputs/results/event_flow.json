@@ -1,5 +1,6 @@
 {
-  "raw_emdat_records": 65,
+  "raw_emdat_records": 86,
+  "physical_disasters_before_cluster": 80,
   "physical_disasters_after_cluster": 65,
   "events_baseline_insufficient": 5,
   "events_valid_target": 60,

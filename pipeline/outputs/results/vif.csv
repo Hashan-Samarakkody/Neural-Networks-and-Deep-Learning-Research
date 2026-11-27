@@ -1,0 +1,9 @@
+Feature,Display_Name,VIF
+Economic_Condition_Index,Economic Condition Index,3.46
+gdp_growth,GDP Growth Rate,2.94
+TWDI,Tourism-Weighted Disaster Impact,1.59
+DSI,Disaster Severity Index,1.52
+global_tourism_idx,Global Tourism Index,1.37
+Season_cos,Seasonality (Cosine),1.34
+Season_sin,Seasonality (Sine),1.33
+external_shock_flag,External Shock Flag,1.0
