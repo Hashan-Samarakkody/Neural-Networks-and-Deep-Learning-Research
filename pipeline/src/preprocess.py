@@ -1,5 +1,5 @@
 """
-Fold-safe feature building (R-01, R-02).
+Fold-safe feature building.
 
 FeatureBuilder.fit(df_train)   — learns DSI scaler, DSI_pos range, ECI scaler
                                    from training rows only.
@@ -21,7 +21,7 @@ from feature_engineering import (
     add_macro_features, add_external_shock_flag,
 )
 
-# R-07: damage_usd_000 is missing for 74 % of records; use 3-component DSI.
+# damage_usd_000 is missing for 74 % of records; use 3-component DSI.
 # Set dsi_include_damage: true in config to revert to 4-component (sensitivity).
 _DSI3 = ["total_affected", "deaths", "duration_days"]
 _DSI4 = ["total_affected", "deaths", "damage_usd_000", "duration_days"]
@@ -74,7 +74,7 @@ class FeatureBuilder:
         z = self._dsi_scaler.transform(log_df)
         df["DSI"] = z.mean(axis=1)
 
-        # R-02: DSI_pos ∈ [0,1]; larger = more severe; monotone in every component
+        # DSI_pos ∈ [0,1]; larger = more severe; monotone in every component
         span = max(self._dsi_max - self._dsi_min, 1e-9)
         df["DSI_pos"] = ((df["DSI"] - self._dsi_min) / span).clip(0.0, 1.0)
 

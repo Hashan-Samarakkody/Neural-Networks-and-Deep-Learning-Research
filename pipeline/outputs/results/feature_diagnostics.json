@@ -1,0 +1,41 @@
+{
+  "reference_fullsample_shape": [
+    60,
+    8
+  ],
+  "fold_train_shape": [
+    37,
+    8
+  ],
+  "feature_means_reference": {
+    "DSI": 0.0,
+    "TWDI": 0.0545,
+    "Season_sin": -0.1466,
+    "Season_cos": 0.1872,
+    "global_tourism_idx": 139.5633,
+    "gdp_growth": 3.2133,
+    "Economic_Condition_Index": -0.0,
+    "external_shock_flag": 0.2333
+  },
+  "feature_means_fold_train": {
+    "DSI": -0.0,
+    "TWDI": 0.0552,
+    "Season_sin": -0.0125,
+    "Season_cos": 0.236,
+    "global_tourism_idx": 144.2568,
+    "gdp_growth": 5.773,
+    "Economic_Condition_Index": 0.0,
+    "external_shock_flag": 0.0
+  },
+  "feature_std_reference": {
+    "DSI": 0.6904,
+    "TWDI": 0.044,
+    "Season_sin": 0.6253,
+    "Season_cos": 0.7433,
+    "global_tourism_idx": 29.315,
+    "gdp_growth": 4.5585,
+    "Economic_Condition_Index": 0.8693,
+    "external_shock_flag": 0.423
+  },
+  "note": "fold_train uses FeatureBuilder fit on train_idx only (fold-safe); reference uses all events"
+}

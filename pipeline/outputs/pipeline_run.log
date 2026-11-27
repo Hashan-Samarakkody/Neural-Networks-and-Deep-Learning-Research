@@ -3,6 +3,11 @@ Tourism Recovery Duration Prediction Pipeline
 Fold-safe features | Chronological split | Log1p DSI |
 Conformal PI | Nested CV | 8 features | No data leakage
 ======================================================================
+[VERSION WARNING] Library versions differ from frozen run:
+  xgboost: expected 2.1.1, got 3.4.1
+  numpy: expected 2.0.2, got 2.2.6
+  shap: expected 0.46.0, got 0.52.0
+  Results may not reproduce exactly. See docs/VERSION_SENSITIVITY.md
 
 [1/6] Loading data...
       312 monthly arrival records (2000-2025)
@@ -30,7 +35,7 @@ Conformal PI | Nested CV | 8 features | No data leakage
       LOOCV fold 40/46
       XGBoost conformal PI half-width (heuristic): +/-4.0036 months
       Empirical coverage: 97.8%
-      Stage-1 accuracy: 0.8696 | F1(non-zero): 0.7
+      Stage-1 accuracy: 0.8478 | F1(non-zero): 0.6316 | AUC: 0.8639 | majority_rate: 0.7826
 
       --- Experiment A Results ---
                Model    MAE   RMSE      R2
@@ -43,6 +48,11 @@ NaivePrevious_Oracle 1.1551 2.5250 -0.0383
                Ridge 1.4924 2.1907  0.2184
            NaiveMean 1.7836 2.5330 -0.0449
       NaiveLastKnown 1.7955 3.3609 -0.7757
+
+[VAL] Additional validation schemes (buffered LOOCV / LOYO / expanding window)...
+      Buffered LOOCV: 46 folds
+      LOYO: 20 folds
+      Expanding window: 7 folds
 
 [5/6] Experiment B -- Chronological split (train <=2018, test >=2019)...
       Train N=37, Test N=23
@@ -59,20 +69,34 @@ NaivePrevious_Oracle 1.1551 2.5250 -0.0383
 NaivePrevious_Oracle 6.0870 8.1933 -1.2318
       NaiveLastKnown 6.0870 8.1933 -1.2318
 
-[6/6] Wilcoxon signed-rank tests...
-      XGBoost vs RandomForest: p=0.036369 YES
-      XGBoost vs Ridge: p=0.000569 YES
-      XGBoost vs SVR: p=0.286461 NO
-      XGBoost vs TwoStage: p=0.032678 YES
-      XGBoost vs NaiveMean: p=0.000108 YES
-      XGBoost vs NaiveMedian: p=0.247601 NO
-      XGBoost vs NaiveLastKnown: p=nan NO
-      XGBoost vs NaivePrevious_Oracle: p=0.860004 NO
+[SURV] Survival analysis (CoxPH + CoxnetAFT)...
+      Survival models:     model  c_index  integrated_brier_score
+    CoxPH      NaN                     NaN
+CoxnetAFT      NaN                     NaN
 
-      Event flow: {'raw_emdat_records': 65, 'physical_disasters_after_cluster': 65, 'events_baseline_insufficient': 5, 'events_valid_target': 60, 'events_right_censored': 10, 'events_zero_months': 38, 'events_in_crisis_window': 14, 'exp_A_N': 46, 'exp_B_N': 60, 'exp_B_train_N': 37, 'exp_B_test_N': 23}
+[6/6] Wilcoxon signed-rank tests...
+      XGBoost vs RandomForest: p_raw=0.115388
+      XGBoost vs Ridge: p_raw=0.0004
+      XGBoost vs SVR: p_raw=0.483352
+      XGBoost vs TwoStage: p_raw=0.434657
+      XGBoost vs NaiveMean: p_raw=0.0001
+      XGBoost vs NaiveMedian: p_raw=0.569243
+      XGBoost vs NaiveLastKnown: p_raw=0.0001
+      XGBoost vs NaivePrevious_Oracle: p_raw=0.394061
+      (Holm) XGBoost vs RandomForest: p_raw=0.115388 p_holm=0.57694 NO
+      (Holm) XGBoost vs Ridge: p_raw=0.0004 p_holm=0.0024 YES
+      (Holm) XGBoost vs SVR: p_raw=0.483352 p_holm=1.0 NO
+      (Holm) XGBoost vs TwoStage: p_raw=0.434657 p_holm=1.0 NO
+      (Holm) XGBoost vs NaiveMean: p_raw=0.0001 p_holm=0.0008 YES
+      (Holm) XGBoost vs NaiveMedian: p_raw=0.569243 p_holm=1.0 NO
+      (Holm) XGBoost vs NaiveLastKnown: p_raw=0.0001 p_holm=0.0008 YES
+      (Holm) XGBoost vs NaivePrevious_Oracle: p_raw=0.394061 p_holm=1.0 NO
+
+      Event flow: {'raw_emdat_records': 86, 'physical_disasters_before_cluster': 80, 'physical_disasters_after_cluster': 65, 'events_baseline_insufficient': 5, 'events_valid_target': 60, 'events_right_censored': 10, 'events_zero_months': 38, 'events_in_crisis_window': 14, 'exp_A_N': 46, 'exp_B_N': 60, 'exp_B_train_N': 37, 'exp_B_test_N': 23}
 
 [SUPP] Supplementary outputs...
       Event-level table: 60 rows → supplementary_event_table.csv
+      DTII report: 60 rows -> dtii_report.csv
       Correlation matrix → feature_correlation_matrix.csv + .png
       Target distribution plot exported.
       Hazard-type performance breakdown:
@@ -80,6 +104,9 @@ NaivePrevious_Oracle 6.0870 8.1933 -1.2318
         Storm: N=8 MAE=0.7584 R2=0.8589
         mixed: N=4 MAE=0.9152 R2=-0.2759
         Flood: N=30 MAE=1.1029 R2=0.3681
+
+[DIAG] Feature diagnostics (Exp B fold-safe vs full-sample reference)...
+      feature_diagnostics.json written.
 
       Running SHAP analysis on XGBoost (Experiment B)...
       SHAP feature ranking:
@@ -93,17 +120,90 @@ NaivePrevious_Oracle 6.0870 8.1933 -1.2318
          8. External Shock Flag: 0.0000
       RQ1-RQ4 summary → rq_summary.json
 
+[IMP] S-18: permutation importance, VIF, grouped importance, ablation...
+      permutation_importance_ExpB_XGBoost.csv, grouped_importance.csv, vif.csv written.
+      ablation_no_index.csv: MAE=0.7905
+
+[BASE] Baseline method comparison (seasonal_mean / seasonal_trend / yoy_growth)...
+      seasonal_mean: N=60 median=0.0 mean=2.90
+      seasonal_trend: N=60 median=0.0 mean=2.95
+      yoy_growth: N=60 median=0.0 mean=3.63
+
+[CONF] Confounding window sensitivity...
+      Confounding variants:      variant  n_events    MAE      R2
+         all        46 1.2399  0.1108
+    excluded        37 0.4574  0.5092
+flagged_only         9 4.5829 -1.0337
+
 [SENS] Sensitivity analysis (threshold x baseline window)...
-      Sensitivity: threshold=80% window=3yr MAE=0.3127 RMSE=0.7494 R2=-0.8541 N=46
-      Sensitivity: threshold=80% window=6yr MAE=0.0435 RMSE=0.2949 R2=-0.0222 N=46
-      Sensitivity: threshold=80% window=12yr MAE=0.0435 RMSE=0.2949 R2=-0.0222 N=46
-      Sensitivity: threshold=90% window=3yr MAE=1.3475 RMSE=2.3681 R2=0.1019 N=46
-      Sensitivity: threshold=90% window=6yr MAE=0.8095 RMSE=1.9494 R2=-0.1564 N=46
-      Sensitivity: threshold=90% window=12yr MAE=0.0652 RMSE=0.4423 R2=-0.0222 N=46
-      Sensitivity: threshold=100% window=3yr MAE=1.0897 RMSE=1.9317 R2=0.7139 N=46
-      Sensitivity: threshold=100% window=6yr MAE=1.6568 RMSE=3.4175 R2=0.1892 N=46
-      Sensitivity: threshold=100% window=12yr MAE=1.7359 RMSE=3.4833 R2=-0.712 N=46
-      Sensitivity grid: 9 combinations.
+      Sensitivity: threshold=75% window=2yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0652 N=46
+      Sensitivity: threshold=75% window=2yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0652 N=46
+      Sensitivity: threshold=75% window=3yr persist=1 zero_share=0.9565 n_cens=0 MAE=0.1454 N=46
+      Sensitivity: threshold=75% window=3yr persist=2 zero_share=0.9565 n_cens=0 MAE=0.1454 N=46
+      Sensitivity: threshold=75% window=4yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=75% window=4yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=75% window=5yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=75% window=5yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=75% window=6yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=75% window=6yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=75% window=12yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=75% window=12yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=80% window=2yr persist=1 zero_share=0.913 n_cens=0 MAE=0.3513 N=46
+      Sensitivity: threshold=80% window=2yr persist=2 zero_share=0.913 n_cens=0 MAE=0.3513 N=46
+      Sensitivity: threshold=80% window=3yr persist=1 zero_share=0.913 n_cens=0 MAE=0.3127 N=46
+      Sensitivity: threshold=80% window=3yr persist=2 zero_share=0.913 n_cens=0 MAE=0.3127 N=46
+      Sensitivity: threshold=80% window=4yr persist=1 zero_share=0.9565 n_cens=0 MAE=0.5145 N=46
+      Sensitivity: threshold=80% window=4yr persist=2 zero_share=0.9565 n_cens=0 MAE=0.5145 N=46
+      Sensitivity: threshold=80% window=5yr persist=1 zero_share=0.9348 n_cens=0 MAE=0.665 N=46
+      Sensitivity: threshold=80% window=5yr persist=2 zero_share=0.9348 n_cens=0 MAE=0.665 N=46
+      Sensitivity: threshold=80% window=6yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=80% window=6yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=80% window=12yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=80% window=12yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0435 N=46
+      Sensitivity: threshold=90% window=2yr persist=1 zero_share=0.7391 n_cens=2 MAE=1.573 N=46
+      Sensitivity: threshold=90% window=2yr persist=2 zero_share=0.7391 n_cens=2 MAE=1.573 N=46
+      Sensitivity: threshold=90% window=3yr persist=1 zero_share=0.7826 n_cens=0 MAE=1.3475 N=46
+      Sensitivity: threshold=90% window=3yr persist=2 zero_share=0.7826 n_cens=0 MAE=1.3475 N=46
+      Sensitivity: threshold=90% window=4yr persist=1 zero_share=0.7391 n_cens=0 MAE=1.2791 N=46
+      Sensitivity: threshold=90% window=4yr persist=2 zero_share=0.7391 n_cens=0 MAE=1.2791 N=46
+      Sensitivity: threshold=90% window=5yr persist=1 zero_share=0.8043 n_cens=0 MAE=0.8903 N=46
+      Sensitivity: threshold=90% window=5yr persist=2 zero_share=0.8043 n_cens=0 MAE=0.8903 N=46
+      Sensitivity: threshold=90% window=6yr persist=1 zero_share=0.8913 n_cens=0 MAE=0.8095 N=46
+      Sensitivity: threshold=90% window=6yr persist=2 zero_share=0.8913 n_cens=0 MAE=0.8095 N=46
+      Sensitivity: threshold=90% window=12yr persist=1 zero_share=0.9783 n_cens=0 MAE=0.0652 N=46
+      Sensitivity: threshold=90% window=12yr persist=2 zero_share=0.9783 n_cens=0 MAE=0.0652 N=46
+      Sensitivity: threshold=95% window=2yr persist=1 zero_share=0.7174 n_cens=2 MAE=1.6925 N=46
+      Sensitivity: threshold=95% window=2yr persist=2 zero_share=0.7174 n_cens=2 MAE=1.6925 N=46
+      Sensitivity: threshold=95% window=3yr persist=1 zero_share=0.7174 n_cens=4 MAE=1.164 N=46
+      Sensitivity: threshold=95% window=3yr persist=2 zero_share=0.7174 n_cens=4 MAE=1.164 N=46
+      Sensitivity: threshold=95% window=4yr persist=1 zero_share=0.7174 n_cens=1 MAE=2.0037 N=46
+      Sensitivity: threshold=95% window=4yr persist=2 zero_share=0.7174 n_cens=1 MAE=2.0037 N=46
+      Sensitivity: threshold=95% window=5yr persist=1 zero_share=0.7174 n_cens=1 MAE=2.0037 N=46
+      Sensitivity: threshold=95% window=5yr persist=2 zero_share=0.7174 n_cens=1 MAE=2.0037 N=46
+      Sensitivity: threshold=95% window=6yr persist=1 zero_share=0.7609 n_cens=5 MAE=1.5161 N=46
+      Sensitivity: threshold=95% window=6yr persist=2 zero_share=0.7609 n_cens=5 MAE=1.5161 N=46
+      Sensitivity: threshold=95% window=12yr persist=1 zero_share=0.8913 n_cens=0 MAE=0.8095 N=46
+      Sensitivity: threshold=95% window=12yr persist=2 zero_share=0.8913 n_cens=0 MAE=0.8095 N=46
+      Sensitivity: threshold=100% window=2yr persist=1 zero_share=0.6739 n_cens=6 MAE=1.6448 N=46
+      Sensitivity: threshold=100% window=2yr persist=2 zero_share=0.6739 n_cens=6 MAE=1.6448 N=46
+      Sensitivity: threshold=100% window=3yr persist=1 zero_share=0.6957 n_cens=4 MAE=1.0897 N=46
+      Sensitivity: threshold=100% window=3yr persist=2 zero_share=0.6957 n_cens=4 MAE=1.0897 N=46
+      Sensitivity: threshold=100% window=4yr persist=1 zero_share=0.6739 n_cens=2 MAE=1.8762 N=46
+      Sensitivity: threshold=100% window=4yr persist=2 zero_share=0.6739 n_cens=2 MAE=1.8762 N=46
+      Sensitivity: threshold=100% window=5yr persist=1 zero_share=0.7174 n_cens=5 MAE=1.7575 N=46
+      Sensitivity: threshold=100% window=5yr persist=2 zero_share=0.7174 n_cens=5 MAE=1.7575 N=46
+      Sensitivity: threshold=100% window=6yr persist=1 zero_share=0.7174 n_cens=5 MAE=1.6568 N=46
+      Sensitivity: threshold=100% window=6yr persist=2 zero_share=0.7174 n_cens=5 MAE=1.6568 N=46
+      Sensitivity: threshold=100% window=12yr persist=1 zero_share=0.8261 n_cens=1 MAE=1.7359 N=46
+      Sensitivity: threshold=100% window=12yr persist=2 zero_share=0.8261 n_cens=1 MAE=1.7359 N=46
+      Sensitivity grid: 60 combinations.
+
+[MACLAG] S-19: macro_lag_years sensitivity (GDP lag 0/1/2)...
+      gdp_lag=0: MAE=0.7485
+      gdp_lag=1: MAE=0.7971
+      gdp_lag=2: MAE=0.766
+
+[PAPER] paper_numbers.json written (11 keys).
 
 ======================================================================
 Pipeline complete. Outputs written to:

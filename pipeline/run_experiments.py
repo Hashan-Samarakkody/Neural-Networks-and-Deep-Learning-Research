@@ -14,6 +14,7 @@ Outputs written to outputs/results/ and outputs/figures/.
 
 import sys
 import json
+import subprocess
 import traceback
 import warnings
 from pathlib import Path
@@ -24,27 +25,63 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
+PINNED = {
+    "xgboost": ("2.1.1", "!="),   # != means warn if differs
+    "numpy": ("2.0.2", "!="),
+    "shap": ("0.46.0", "!="),
+}
+
+
+def _assert_versions():
+    import importlib.metadata
+    mismatches = []
+    for pkg, (expected, op) in PINNED.items():
+        try:
+            actual = importlib.metadata.version(pkg)
+        except importlib.metadata.PackageNotFoundError:
+            actual = "not installed"
+        if op == "!=" and actual != expected:
+            mismatches.append(f"  {pkg}: expected {expected}, got {actual}")
+    if mismatches:
+        print("[VERSION WARNING] Library versions differ from frozen run:")
+        for m in mismatches:
+            print(m)
+        print("  Results may not reproduce exactly. See docs/VERSION_SENSITIVITY.md")
+
+
+def _get_commit_hash() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return "unknown"
+
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from data_loader import load_config, load_arrivals, load_emdat, validate_data
+from data_loader import load_config, load_arrivals, load_emdat, validate_data, _EMDAT_FLOW
 from baseline_counterfactual import build_recovery_targets
 from feature_engineering import FEATURE_COLS
 from preprocess import FeatureBuilder
-from validation import chronological_split
+from validation import (
+    chronological_split, buffered_loocv_split,
+    leave_one_year_out_split, expanding_window_split,
+)
 from train import (
-    run_loocv, run_chronological_split,
+    run_loocv, run_chronological_split, run_multisplit,
     naive_baselines_loocv, naive_baselines_split,
 )
 from evaluate import (
     summarize_experiment, conformal_pi_from_loocv, wilcoxon_comparison,
-    target_distribution_summary,
+    target_distribution_summary, holm_correction,
 )
 from explainability import run_shap_analysis
+from confounding import flag_confounded_events, run_confounding_variants
 from supplementary import (
     export_event_level_table, export_correlation_matrix,
     export_target_distribution_plot, export_rq_summary,
-    export_hazard_type_performance,
+    export_hazard_type_performance, export_dtii_report,
 )
 
 
@@ -58,18 +95,39 @@ def _p(*args, **kwargs):
     sys.stdout.flush()
 
 
+def _get_regime(year: int, confounded_by: str = "") -> str:
+    """Assign regime label to an event."""
+    if confounded_by and "civil_war_end" in str(confounded_by):
+        return "confounded_civil_war"
+    if 2019 <= year <= 2022:
+        return "easter_covid_crisis"
+    if year >= 2023:
+        return "post_crisis_recovery"
+    return "baseline"
+
+
 def _save_predictions(results: dict, df_events: pd.DataFrame, experiment_name: str, results_dir: Path):
-    """R-16: save per-event predictions for all models."""
+    """Save per-event predictions with regime column for all models."""
     rows = []
     for model_name, res in results.items():
         for idx, (yt, yp) in enumerate(zip(res["y_true"], res["y_pred"])):
-            event_id = str(df_events.iloc[idx]["disaster_id"]) if idx < len(df_events) else str(idx)
-            onset = str(df_events.iloc[idx]["start_date"]) if idx < len(df_events) else ""
+            if idx < len(df_events):
+                ev = df_events.iloc[idx]
+                event_id = str(ev.get("disaster_id", idx))
+                onset = str(ev.get("start_date", ""))
+                year = int(ev.get("start_year", 0))
+                confounded_by = str(ev.get("confounded_by", ""))
+                regime = _get_regime(year, confounded_by)
+            else:
+                event_id = str(idx)
+                onset = ""
+                regime = "unknown"
             rows.append({
                 "experiment": experiment_name,
                 "model": model_name,
                 "event_id": event_id,
                 "onset": onset,
+                "regime": regime,
                 "y_true": yt,
                 "y_pred": yp,
             })
@@ -83,6 +141,7 @@ def main():
     _p("Conformal PI | Nested CV | 8 features | No data leakage")
     _p("=" * 70)
 
+    _assert_versions()
     run_start = datetime.utcnow()
     cfg = load_config(CFG_PATH)
     figures_dir = ROOT / cfg["paths"]["figures_dir"]
@@ -102,10 +161,9 @@ def main():
     _p("\n[2/6] Computing seasonally adjusted recovery targets...")
     df_all = build_recovery_targets(emdat, arrivals, cfg)
 
-    # R-03: drop events with insufficient baseline history
     n_insufficient = df_all["baseline_insufficient"].sum()
     if n_insufficient:
-        _p(f"      Dropping {n_insufficient} events with insufficient baseline history (R-03)")
+        _p(f"      Dropping {n_insufficient} events with insufficient baseline history")
         dropped = df_all[df_all["baseline_insufficient"]][["disaster_id", "start_year", "start_month"]]
         _p(f"      Dropped: {dropped.to_dict('records')}")
 
@@ -130,6 +188,7 @@ def main():
     fb_ref = FeatureBuilder(cfg)
     fb_ref.fit(df_with_targets)
     df_feat_ref = fb_ref.transform(df_with_targets)
+    df_feat_ref.to_csv(results_dir / "reference_fullsample.csv", index=False)
     X_ref = df_feat_ref[FEATURE_COLS].values
     y_ref = df_with_targets["recovery_months"].values
     _p(f"      Reference feature matrix shape: {X_ref.shape}")
@@ -150,10 +209,10 @@ def main():
     _p(f"      Experiment A (pure natural hazards): N = {len(df_A)}")
     _p(f"      Experiment B (all events incl. shocks): N = {len(df_B)}")
 
-    # R-04: event-flow table
     event_flow = {
-        "raw_emdat_records": len(emdat),
-        "physical_disasters_after_cluster": len(emdat),
+        "raw_emdat_records": _EMDAT_FLOW.get("raw_emdat_records", len(emdat)),
+        "physical_disasters_before_cluster": _EMDAT_FLOW.get("physical_disasters_before_cluster", len(emdat)),
+        "physical_disasters_after_cluster": _EMDAT_FLOW.get("physical_disasters_after_cluster", len(emdat)),
         "events_baseline_insufficient": int(n_insufficient),
         "events_valid_target": dist["n_total"],
         "events_right_censored": dist["n_right_censored_12"],
@@ -162,6 +221,13 @@ def main():
         "exp_A_N": int(len(df_A)),
         "exp_B_N": int(len(df_B)),
     }
+    _n_clustered = event_flow["physical_disasters_after_cluster"]
+    _n_valid = event_flow["events_valid_target"]
+    _n_insuff = event_flow["events_baseline_insufficient"]
+    assert _n_clustered == _n_valid + _n_insuff, (
+        f"Event flow arithmetic error: {_n_clustered} clustered != "
+        f"{_n_valid} valid + {_n_insuff} insufficient"
+    )
 
     # ── 4. Experiment A (LOOCV) ────────────────────────────────────────────
     _p("\n[4/6] Experiment A -- LOOCV on pure natural hazards...")
@@ -178,27 +244,43 @@ def main():
     _p(f"      Empirical coverage: {pi_A['empirical_coverage'] * 100:.1f}%")
 
     if "TwoStage" in results_A:
-        ts = results_A["TwoStage"]
         from two_stage_model import stage1_loocv_accuracy
-        # Approximate stage1 accuracy from integrated LOOCV results
-        y_true_bin = [int(v > 0) for v in ts["y_true"]]
-        y_pred_bin = [int(round(p) > 0) for p in ts["y_pred"]]
-        from sklearn.metrics import accuracy_score, f1_score
-        s1_acc = {
-            "stage1_accuracy": round(accuracy_score(y_true_bin, y_pred_bin), 4),
-            "stage1_f1_nonzero": round(f1_score(y_true_bin, y_pred_bin, zero_division=0), 4),
-            "stage1_n_zero": int(sum(1 for v in y_true_bin if v == 0)),
-            "stage1_n_nonzero": int(sum(1 for v in y_true_bin if v == 1)),
-        }
+        s1_acc = stage1_loocv_accuracy(X_A, y_A)
         _p(f"      Stage-1 accuracy: {s1_acc['stage1_accuracy']} | "
-           f"F1(non-zero): {s1_acc['stage1_f1_nonzero']}")
+           f"F1(non-zero): {s1_acc['stage1_f1_nonzero']} | "
+           f"AUC: {s1_acc['stage1_auc']} | "
+           f"majority_rate: {s1_acc['stage1_majority_rate']}")
 
     summary_A = summarize_experiment(results_A, "ExpA_LOOCV")
     _p("\n      --- Experiment A Results ---")
     _p(summary_A[["Model", "MAE", "RMSE", "R2"]].to_string(index=False))
 
-    # R-16: save per-event predictions
     _save_predictions(results_A, df_A, "ExpA_LOOCV", results_dir)
+
+    # ── Additional validation schemes ─────────────────────────────────────
+    _p("\n[VAL] Additional validation schemes (buffered LOOCV / LOYO / expanding window)...")
+    extra_summaries = []
+    try:
+        buf_splits = buffered_loocv_split(df_A, buffer_months=12)
+        _p(f"      Buffered LOOCV: {len(buf_splits)} folds")
+        res_buf = run_multisplit(df_A, buf_splits, cfg)
+        extra_summaries.append(summarize_experiment(res_buf, "ExpA_BufferedLOOCV"))
+    except Exception as e:
+        _p(f"      [WARN] Buffered LOOCV skipped: {e}")
+    try:
+        loyo_splits = leave_one_year_out_split(df_A)
+        _p(f"      LOYO: {len(loyo_splits)} folds")
+        res_loyo = run_multisplit(df_A, loyo_splits, cfg)
+        extra_summaries.append(summarize_experiment(res_loyo, "ExpA_LOYO"))
+    except Exception as e:
+        _p(f"      [WARN] LOYO skipped: {e}")
+    try:
+        ew_splits = expanding_window_split(df_A)
+        _p(f"      Expanding window: {len(ew_splits)} folds")
+        res_ew = run_multisplit(df_A, ew_splits, cfg)
+        extra_summaries.append(summarize_experiment(res_ew, "ExpA_ExpandingWindow"))
+    except Exception as e:
+        _p(f"      [WARN] Expanding window skipped: {e}")
 
     # ── 5. Experiment B (chronological split) ──────────────────────────────
     _p("\n[5/6] Experiment B -- Chronological split (train <=2018, test >=2019)...")
@@ -237,8 +319,13 @@ def main():
     _p("\n      --- Experiment B Results ---")
     _p(summary_B[["Model", "MAE", "RMSE", "R2"]].to_string(index=False))
 
-    # R-16: save per-event predictions
     _save_predictions(results_B_eval, df_B.iloc[test_idx].reset_index(drop=True), "ExpB_Chronological", results_dir)
+
+    # ── Survival analysis ──────────────────────────────────────────────────
+    _p("\n[SURV] Survival analysis (CoxPH + CoxnetAFT)...")
+    from survival import export_survival_results
+    surv_df = export_survival_results(df_B, cfg, train_idx, test_idx, results_dir)
+    _p(f"      Survival models: {surv_df[['model','c_index','integrated_brier_score']].to_string(index=False)}")
 
     # ── 6. Wilcoxon tests ──────────────────────────────────────────────────
     _p("\n[6/6] Wilcoxon signed-rank tests...")
@@ -255,16 +342,40 @@ def main():
                 "XGBoost", opponent,
             )
             tests.append(w)
-            sig = "YES" if w["significant_at_0.05"] else "NO"
-            _p(f"      XGBoost vs {opponent}: p={w['p_value']} {sig}")
+            _p(f"      XGBoost vs {opponent}: p_raw={w['p_raw']}")
+    p_raws = [t["p_raw"] for t in tests]
+    p_holms = holm_correction(p_raws)
+    for t, ph in zip(tests, p_holms):
+        t["p_holm"] = round(ph, 6)
+        t["significant_at_0.05"] = bool(ph < 0.05)
+        sig = "YES" if t["significant_at_0.05"] else "NO"
+        _p(f"      (Holm) XGBoost vs {t['model_b']}: p_raw={t['p_raw']} p_holm={t['p_holm']} {sig}")
     tests_df = pd.DataFrame(tests)
 
     # ── Save results ───────────────────────────────────────────────────────
-    all_results = pd.concat([summary_A, summary_B], ignore_index=True)
+    all_results = pd.concat([summary_A, summary_B] + extra_summaries, ignore_index=True)
+    def _regime_counts(df_ev):
+        regs = df_ev.apply(
+            lambda r: _get_regime(int(r.get("start_year", 0)), str(r.get("confounded_by", ""))),
+            axis=1,
+        )
+        vc = regs.value_counts()
+        return {
+            "n_baseline": int(vc.get("baseline", 0)),
+            "n_easter_covid_crisis": int(vc.get("easter_covid_crisis", 0)),
+            "n_post_crisis_recovery": int(vc.get("post_crisis_recovery", 0)),
+            "n_confounded_civil_war": int(vc.get("confounded_civil_war", 0)),
+        }
+    rc_A = _regime_counts(df_A)
+    rc_B = _regime_counts(df_B)
+    for col, val in rc_A.items():
+        all_results.loc[all_results["Experiment"].str.startswith("ExpA"), col] = val
+    for col, val in rc_B.items():
+        all_results.loc[all_results["Experiment"].str.startswith("ExpB"), col] = val
     all_results.to_csv(results_dir / "experiment_results.csv", index=False)
     tests_df.to_csv(results_dir / "wilcoxon_tests.csv", index=False)
-    if "s1_acc" in dir():
-        with open(results_dir / "two_stage_stage1_accuracy.json", "w") as f:
+    if "s1_acc" in locals():
+        with open(results_dir / "two_stage_stage1.json", "w") as f:
             json.dump(s1_acc, f, indent=2)
 
     if xgb_res_B:
@@ -274,7 +385,6 @@ def main():
         ])
         pi_summary.to_csv(results_dir / "conformal_prediction_intervals.csv", index=False)
 
-    # R-04: save event-flow table
     with open(results_dir / "event_flow.json", "w") as f:
         json.dump(event_flow, f, indent=2)
     _p(f"\n      Event flow: {event_flow}")
@@ -283,6 +393,7 @@ def main():
     _p("\n[SUPP] Supplementary outputs...")
     X_df = pd.DataFrame(X_ref, columns=FEATURE_COLS)
     export_event_level_table(df_B, X_df, results_dir)
+    export_dtii_report(df_B, results_dir)
     export_correlation_matrix(X_df, results_dir, figures_dir)
     export_target_distribution_plot(y_B, figures_dir, dist)
 
@@ -293,11 +404,39 @@ def main():
             results_dir, "ExpA_LOOCV",
         )
 
+    # ── Feature diagnostics for Exp B ─────────────────────────────────────
+    _p("\n[DIAG] Feature diagnostics (Exp B fold-safe vs full-sample reference)...")
+    try:
+        fb_B_diag = results_B.get("XGBoost", {}).get("feature_builder", fb_ref)
+        X_B_full = fb_ref.transform(df_B)[FEATURE_COLS].values
+        X_B_train_diag = fb_B_diag.transform(df_B.iloc[train_idx])[FEATURE_COLS].values
+        diag = {
+            "reference_fullsample_shape": list(X_B_full.shape),
+            "fold_train_shape": list(X_B_train_diag.shape),
+            "feature_means_reference": {
+                f: round(float(np.mean(X_B_full[:, i])), 4)
+                for i, f in enumerate(FEATURE_COLS)
+            },
+            "feature_means_fold_train": {
+                f: round(float(np.mean(X_B_train_diag[:, i])), 4)
+                for i, f in enumerate(FEATURE_COLS)
+            },
+            "feature_std_reference": {
+                f: round(float(np.std(X_B_full[:, i])), 4)
+                for i, f in enumerate(FEATURE_COLS)
+            },
+            "note": "fold_train uses FeatureBuilder fit on train_idx only (fold-safe); reference uses all events",
+        }
+        with open(results_dir / "feature_diagnostics.json", "w") as f:
+            json.dump(diag, f, indent=2)
+        _p("      feature_diagnostics.json written.")
+    except Exception as e:
+        _p(f"      [WARN] Feature diagnostics skipped: {e}")
+
     shap_df = None
     xgb_model_B = results_B.get("XGBoost", {}).get("model", None)
     if xgb_model_B is not None:
         _p("\n      Running SHAP analysis on XGBoost (Experiment B)...")
-        # R-01: use training-fold features for SHAP
         fb_B = results_B["XGBoost"].get("feature_builder", fb_ref)
         X_B_train = fb_B.transform(df_B.iloc[train_idx])[FEATURE_COLS].values
         shap_df = run_shap_analysis(
@@ -312,13 +451,71 @@ def main():
 
     export_rq_summary(dist, summary_A, summary_B, tests_df, shap_df, results_dir)
 
+    # ── Permutation importance, VIF, grouped importance, ablation ─────────
+    _p("\n[IMP] Permutation importance, VIF, grouped importance, ablation...")
+    try:
+        from explainability import run_r19_analysis, run_ablation_no_index
+        xgb_model_A_last = None
+        # Use Exp B XGBoost for permutation importance (has held-out test set)
+        if xgb_model_B is not None:
+            fb_B_imp = results_B.get("XGBoost", {}).get("feature_builder", fb_ref)
+            X_B_te = fb_B_imp.transform(df_B.iloc[test_idx])[FEATURE_COLS].values
+            y_B_te = y_B[test_idx]
+            X_B_tr = fb_B_imp.transform(df_B.iloc[train_idx])[FEATURE_COLS].values
+            run_r19_analysis(
+                xgb_model_B, X_B_te, y_B_te, X_B_tr, FEATURE_COLS,
+                results_dir, "ExpB", "XGBoost",
+            )
+            _p("      permutation_importance_ExpB_XGBoost.csv, grouped_importance.csv, vif.csv written.")
+        abl_df = run_ablation_no_index(df_A, cfg, results_dir, seed=SEED)
+        _p(f"      ablation_no_index.csv: MAE={abl_df['MAE'].iloc[0]}")
+    except Exception as e:
+        _p(f"      [WARN] S-18 analysis skipped: {e}")
+
+    # ── Baseline method comparison ─────────────────────────────────────────
+    _p("\n[BASE] Baseline method comparison (seasonal_mean / seasonal_trend / yoy_growth)...")
+    try:
+        from baseline_counterfactual import build_recovery_targets as _brt
+        base_rows = []
+        for bmethod in ["seasonal_mean", "seasonal_trend", "yoy_growth"]:
+            cfg_b = {**cfg, "baseline": {**cfg.get("baseline", {}), "method": bmethod}}
+            df_bm = _brt(emdat, arrivals, cfg_b)
+            df_bm = df_bm[~df_bm["baseline_insufficient"]].dropna(subset=["recovery_months"])
+            y_bm = df_bm["recovery_months"].values
+            base_rows.append({
+                "method": bmethod,
+                "n_events": len(y_bm),
+                "median_recovery": float(np.median(y_bm)),
+                "mean_recovery": round(float(np.mean(y_bm)), 3),
+                "n_right_censored": int(np.sum(y_bm == 12)),
+                "n_zero": int(np.sum(y_bm == 0)),
+            })
+            _p(f"      {bmethod}: N={len(y_bm)} median={np.median(y_bm):.1f} mean={np.mean(y_bm):.2f}")
+        pd.DataFrame(base_rows).to_csv(results_dir / "baseline_method_comparison.csv", index=False)
+    except Exception as e:
+        _p(f"      [WARN] Baseline method comparison skipped: {e}")
+
+    # ── Confounding sensitivity ────────────────────────────────────────────
+    _p("\n[CONF] Confounding window sensitivity...")
+    try:
+        from xgboost import XGBRegressor as _XGB
+        df_A_flagged = flag_confounded_events(df_A, cfg)
+        conf_df = run_confounding_variants(
+            df_A_flagged, X_A, y_A, cfg, _XGB, {}, results_dir, seed=SEED,
+        )
+        _p(f"      Confounding variants: {conf_df[['variant','n_events','MAE','R2']].to_string(index=False)}")
+        # Carry confounded_by back for event table
+        df_A = df_A_flagged
+        df_B = flag_confounded_events(df_B, cfg)
+    except Exception as e:
+        _p(f"      [WARN] Confounding sensitivity skipped: {e}")
+
     # ── Sensitivity analysis ───────────────────────────────────────────────
     _p("\n[SENS] Sensitivity analysis (threshold x baseline window)...")
     try:
         from sensitivity_analysis import run_full_sensitivity
         from xgboost import XGBRegressor
 
-        # R-15: use config default params, not last-fold params
         xgb_default_params = {}
 
         sens_cfg = cfg.get("sensitivity_analysis", {})
@@ -330,6 +527,7 @@ def main():
             crisis_years=crisis_years,
             results_dir=results_dir,
             seed=SEED,
+            persistence_values=sens_cfg.get("persistence_values", [1]),
         )
         _p(f"      Sensitivity grid: {len(sens_df)} combinations.")
     except Exception as e:
@@ -340,7 +538,7 @@ def main():
     import platform, importlib.metadata
     run_end = datetime.utcnow()
     manifest = {
-        "commit": "see git log",
+        "commit": _get_commit_hash(),
         "python_version": sys.version,
         "platform": platform.platform(),
         "seed": SEED,
@@ -356,6 +554,57 @@ def main():
     }
     with open(results_dir / "run_manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
+
+    # ── Macro lag sensitivity ──────────────────────────────────────────────
+    _p("\n[MACLAG] macro_lag_years sensitivity (GDP lag 0/1/2)...")
+    try:
+        from feature_engineering import get_macro_features, FEATURE_COLS as FC
+        from sklearn.metrics import mean_absolute_error as _mae
+        import xgboost as _xgb
+        from preprocess import FeatureBuilder as _FB
+        from sklearn.model_selection import LeaveOneOut as _LOO
+
+        lag_rows = []
+        for lag in [0, 1, 2]:
+            # Build feature matrix with shifted GDP year
+            df_lag = df_A.copy()
+            gdp_lag = []
+            for _, row in df_lag.iterrows():
+                try:
+                    m = get_macro_features(int(row["start_year"]) - lag)
+                    gdp_lag.append(m.get("gdp_growth", 0.0))
+                except KeyError:
+                    gdp_lag.append(0.0)
+            df_lag["gdp_growth_lag"] = gdp_lag
+
+            # Quick LOOCV with XGBoost using modified gdp_growth
+            fb_l = _FB(cfg)
+            fb_l.fit(df_lag)
+            df_feat_l = fb_l.transform(df_lag)
+            df_feat_l["gdp_growth"] = df_lag["gdp_growth_lag"].values
+            X_l = df_feat_l[FC].values
+            y_l = y_A
+
+            loo_p, loo_t = [], []
+            for tr, te in _LOO().split(X_l):
+                m_xgb = _xgb.XGBRegressor(random_state=SEED, verbosity=0, nthread=1)
+                m_xgb.fit(X_l[tr], y_l[tr])
+                loo_p.append(float(np.clip(m_xgb.predict(X_l[te])[0], 0, 12)))
+                loo_t.append(float(y_l[te[0]]))
+            lag_mae = round(float(_mae(loo_t, loo_p)), 4)
+            lag_rows.append({"gdp_lag_years": lag, "MAE": lag_mae, "n_events": len(y_l)})
+            _p(f"      gdp_lag={lag}: MAE={lag_mae}")
+
+        pd.DataFrame(lag_rows).to_csv(results_dir / "macro_lag_sensitivity.csv", index=False)
+    except Exception as e:
+        _p(f"      [WARN] macro_lag sensitivity skipped: {e}")
+
+    try:
+        from paper_numbers import extract_paper_numbers
+        pn = extract_paper_numbers(results_dir)
+        _p(f"\n[PAPER] paper_numbers.json written ({len(pn)} keys).")
+    except Exception as e:
+        _p(f"      [WARN] paper_numbers.json skipped: {e}")
 
     _p("\n" + "=" * 70)
     _p("Pipeline complete. Outputs written to:")

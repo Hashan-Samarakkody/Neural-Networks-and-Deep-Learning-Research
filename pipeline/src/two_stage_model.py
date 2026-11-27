@@ -10,7 +10,6 @@ Combined rule:
 
 Hyperparameters are fixed (C=1, alpha=1) because the non-zero training
 subset in LOOCV has only ~12 events — too small for meaningful inner CV.
-# ponytail: fixed hparams; add nested CV when N_nonzero > 30
 """
 
 import numpy as np
@@ -18,7 +17,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import LeaveOneOut
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
 SEED = 42
 _MAX = 12
@@ -30,7 +29,7 @@ def _fit(X_train: np.ndarray, y_train: np.ndarray):
     Xs = scaler.fit_transform(X_train)
     y_binary = (y_train > 0).astype(int)
     if len(np.unique(y_binary)) < 2:
-        # ponytail: single-class fallback; rare edge case in LOOCV folds near start
+        # single-class fallback; rare edge case in LOOCV folds near start
         clf = DummyClassifier(strategy="most_frequent")
     else:
         clf = LogisticRegression(C=1.0, max_iter=1000, random_state=SEED, solver="lbfgs")
@@ -76,16 +75,29 @@ def run_two_stage_split(
 
 
 def stage1_loocv_accuracy(X: np.ndarray, y: np.ndarray) -> dict:
-    """LOOCV accuracy of the stage-1 classifier only."""
-    true_bin, pred_bin = [], []
+    """LOOCV accuracy + AUC + majority_rate for stage-1 classifier."""
+    true_bin, pred_bin, pred_proba = [], [], []
     for train_idx, test_idx in LeaveOneOut().split(X):
         scaler, clf, _ = _fit(X[train_idx], y[train_idx])
+        Xs_te = scaler.transform(X[test_idx])
         true_bin.append(int(y[test_idx[0]] > 0))
-        pred_bin.append(int(clf.predict(scaler.transform(X[test_idx]))[0]))
+        pred_bin.append(int(clf.predict(Xs_te)[0]))
+        if hasattr(clf, "predict_proba"):
+            proba = clf.predict_proba(Xs_te)[0]
+            pred_proba.append(float(proba[1]) if len(proba) > 1 else float(proba[0]))
+        else:
+            pred_proba.append(float(pred_bin[-1]))
     tb, pb = np.array(true_bin), np.array(pred_bin)
+    majority_rate = round(float(max(tb.mean(), 1 - tb.mean())), 4)
+    try:
+        auc = round(float(roc_auc_score(tb, np.array(pred_proba))), 4)
+    except Exception:
+        auc = float("nan")
     return {
         "stage1_accuracy": round(float(accuracy_score(tb, pb)), 4),
         "stage1_f1_nonzero": round(float(f1_score(tb, pb, zero_division=0)), 4),
+        "stage1_auc": auc,
+        "stage1_majority_rate": majority_rate,
         "stage1_n_zero": int((tb == 0).sum()),
         "stage1_n_nonzero": int((tb == 1).sum()),
     }

@@ -40,19 +40,19 @@
       "experiment_B_best_MAE": 4.8835,
       "wilcoxon_vs_naive": {
         "NaiveMean": {
-          "p_value": 0.000108,
+          "p_value": null,
           "significant": true
         },
         "NaiveMedian": {
-          "p_value": 0.247601,
+          "p_value": null,
           "significant": false
         },
         "NaiveLastKnown": {
-          "p_value": NaN,
-          "significant": false
+          "p_value": null,
+          "significant": true
         },
         "NaivePrevious_Oracle": {
-          "p_value": 0.860004,
+          "p_value": null,
           "significant": false
         }
       },

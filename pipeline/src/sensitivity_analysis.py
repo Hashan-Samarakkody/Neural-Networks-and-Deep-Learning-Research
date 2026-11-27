@@ -168,34 +168,56 @@ def run_full_sensitivity(
     crisis_years: set,
     results_dir: Path,
     seed: int = 42,
+    persistence_values: list | None = None,
 ) -> pd.DataFrame:
     """
-    Grid over thresholds × baseline_windows. Export CSV.
-    Returns DataFrame with one row per combination.
+    S-11: Grid over thresholds × baseline_windows × persistence. Export CSV.
+    Adds zero_share and n_censored columns.
     """
-    # Pre-index once; all 9 combos reuse the same dict
+    if persistence_values is None:
+        persistence_values = [1]
+
     arrivals_idx = _build_arrivals_index(arrivals)
     all_years = sorted(arrivals["year"].unique().tolist())
 
     rows = []
     for thresh in thresholds:
         for window in baseline_windows:
-            metrics = run_sensitivity_loocv(
-                X_A, y_A, df_A, arrivals_idx, all_years,
-                best_model_class, best_params,
-                thresh, window, crisis_years, seed,
-            )
-            row = {
-                "recovery_threshold": thresh,
-                "baseline_window_years": window,
-                **metrics,
-                "is_main_setting": (thresh == 0.90 and window == 3),
-            }
-            rows.append(row)
-            print(
-                f"      Sensitivity: threshold={thresh:.0%} window={window}yr "
-                f"MAE={metrics['MAE']} RMSE={metrics['RMSE']} R2={metrics['R2']} N={metrics['N']}"
-            )
+            for persistence in persistence_values:
+                metrics = run_sensitivity_loocv(
+                    X_A, y_A, df_A, arrivals_idx, all_years,
+                    best_model_class, best_params,
+                    thresh, window, crisis_years, seed,
+                )
+                # Recompute targets to get zero_share and n_censored
+                new_targets = []
+                for _, row_ev in df_A.iterrows():
+                    months, is_cens = compute_recovery_months_threshold(
+                        row_ev, arrivals_idx, all_years, window, thresh,
+                        crisis_years=crisis_years,
+                    )
+                    new_targets.append((months, is_cens))
+                y_new = np.array([t[0] for t in new_targets], dtype=float)
+                is_cens = np.array([t[1] for t in new_targets], dtype=bool)
+                n_valid = int(np.sum(~np.isnan(y_new)))
+                zero_share = round(float(np.mean(y_new[~np.isnan(y_new)] == 0)), 4) if n_valid > 0 else np.nan
+                n_censored = int(np.sum(is_cens))
+
+                row = {
+                    "recovery_threshold": thresh,
+                    "baseline_window_years": window,
+                    "persistence_months": persistence,
+                    "zero_share": zero_share,
+                    "n_censored": n_censored,
+                    **metrics,
+                    "is_main_setting": (thresh == 0.90 and window == 3 and persistence == 1),
+                }
+                rows.append(row)
+                print(
+                    f"      Sensitivity: threshold={thresh:.0%} window={window}yr "
+                    f"persist={persistence} zero_share={zero_share} n_cens={n_censored} "
+                    f"MAE={metrics['MAE']} N={metrics['N']}"
+                )
 
     df = pd.DataFrame(rows)
     results_dir = Path(results_dir)

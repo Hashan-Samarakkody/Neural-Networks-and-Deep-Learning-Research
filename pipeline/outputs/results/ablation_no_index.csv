@@ -1,0 +1,2 @@
+experiment,features_removed,n_features,MAE,RMSE,R2
+ExpA_LOOCV_no_index,"DSI,TWDI",6,0.7905,1.7318,0.5116

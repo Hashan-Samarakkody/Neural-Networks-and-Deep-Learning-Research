@@ -50,11 +50,15 @@ All experiments use `seed=42` (global `np.random.seed` and per-estimator `random
 
 ## Key Findings
 
-- **Target distribution:** 58.5% of events have T_rec = 0 months (immediate recovery); median = 0; mean = 3.45; 20% right-censored at 12 months.
-- **Exp A best ML model:** XGBoost (MAE = 1.83). NaivePrevious baseline beats all ML models (MAE = 1.49) due to zero-inflation.
-- **Exp B best model:** Ridge (MAE = 2.51, R² = 0.69); high R² reflects External_Shock_Flag step-level effect in test period.
-- **Statistical significance:** XGBoost significantly outperforms NaiveMean (p = 0.0001) but not NaiveMedian (p = 0.669).
-- **Top SHAP features:** global_tourism_idx, Economic_Condition_Index, gdp_growth.
+> Numbers sourced from `pipeline/outputs/results/paper_numbers.json` (frozen run, seed=42).
+
+- **Sample:** 86 raw EM-DAT records → 80 physical disasters → 65 after clustering → 60 with valid recovery target.
+- **Target distribution:** 63% of events have T_rec = 0 months (immediate recovery); median = 0; mean ≈ 2.9 months; 16.7% right-censored at 12 months.
+- **Exp A (LOOCV, N=46 pure natural hazards):** TwoStage best (MAE = 0.75), XGBoost second (MAE = 0.93).
+- **Exp B (chronological split, N=60):** TwoStage best (MAE = 3.50); test period dominated by compound shock events (2019–2022).
+- **Statistical significance:** XGBoost vs NaiveMean p_holm < 0.001 (sign-flip permutation + Holm correction).
+- **Top SHAP features (Exp B XGBoost):** global_tourism_idx, gdp_growth, Season_sin.
+- **Survival analysis:** CoxPH and CoxnetAFT C-index reported in `survival_results.csv`.
 
 ## Configuration
 

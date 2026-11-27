@@ -36,31 +36,34 @@ def block_bootstrap_ci(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     n_bootstrap: int = 1000,
-    block_months: int = 12,
+    block_events: int = 6,
     seed: int = 42,
     onsets: np.ndarray | None = None,
 ) -> dict:
     """
-    R-11: Moving-block bootstrap CI for MAE, RMSE, R².
+    S-08: Moving-block bootstrap CI for MAE, RMSE, R².
 
-    Events are ordered by onset (or by index if onsets is None).
-    Contiguous blocks of `block_months` worth of events are resampled.
-    Accounts for temporal dependence between nearby events.
+    block_events: number of consecutive events per block (not months).
+    Contiguous overlapping blocks of block_events events are resampled
+    to account for temporal dependence between nearby events.
+    Default block_events=6 (~12 months for typical event spacing).
     """
     rng = np.random.default_rng(seed)
     y_true = np.array(y_true, dtype=float)
     y_pred = np.array(y_pred, dtype=float)
     n = len(y_true)
 
-    # Build blocks: group indices into windows of block_months events
-    # Simple approach: fixed-size blocks of ceil(n / (n/block_months)) events
-    block_size = max(1, int(np.ceil(n / max(n / block_months, 1))))
-    blocks = [list(range(i, min(i + block_size, n))) for i in range(0, n, block_size)]
+    block_size = max(1, min(block_events, n))
+    # Overlapping blocks: start indices 0..n-block_size
+    n_possible = n - block_size + 1
+    blocks = [list(range(i, i + block_size)) for i in range(n_possible)]
     n_blocks = len(blocks)
+    # Number of blocks to draw so expected resample length >= n
+    n_draw = max(1, int(np.ceil(n / block_size)))
 
     boot_mae, boot_rmse, boot_r2 = [], [], []
     for _ in range(n_bootstrap):
-        chosen = rng.integers(0, n_blocks, size=n_blocks)
+        chosen = rng.integers(0, n_blocks, size=n_draw)
         idx = np.concatenate([blocks[c] for c in chosen])[:n]
         yt, yp = y_true[idx], y_pred[idx]
         boot_mae.append(mean_absolute_error(yt, yp))
@@ -77,8 +80,8 @@ def block_bootstrap_ci(
         "MAE_95CI_block_bootstrap": ci(boot_mae),
         "RMSE_95CI_block_bootstrap": ci(boot_rmse),
         "R2_95CI_block_bootstrap": ci(boot_r2) if boot_r2 else (None, None),
-        "bootstrap_type": "block",
-        "block_months": block_months,
+        "bootstrap_type": "overlapping_block",
+        "block_events": block_events,
         "n_bootstrap": n_bootstrap,
     }
 
@@ -150,6 +153,51 @@ def conformal_pi_from_loocv(
     }
 
 
+def sign_flip_permutation_test(
+    y_true: np.ndarray,
+    pred_a: np.ndarray,
+    pred_b: np.ndarray,
+    n_permutations: int = 10000,
+    seed: int = 42,
+) -> tuple[float, float]:
+    """
+    S-07: Sign-flip permutation test for paired absolute errors.
+    H0: median(|e_A| - |e_B|) = 0.
+    Returns (observed_stat, p_value).
+    """
+    rng = np.random.default_rng(seed)
+    ae_a = np.abs(y_true - pred_a)
+    ae_b = np.abs(y_true - pred_b)
+    diffs = ae_a - ae_b
+    n_nonzero = int(np.sum(diffs != 0))
+    if n_nonzero == 0:
+        return 0.0, 1.0
+
+    obs = float(np.mean(diffs))
+    count = 0
+    for _ in range(n_permutations):
+        signs = rng.choice([-1.0, 1.0], size=len(diffs))
+        perm_stat = float(np.mean(diffs * signs))
+        if abs(perm_stat) >= abs(obs):
+            count += 1
+    p = (count + 1) / (n_permutations + 1)
+    return obs, float(p)
+
+
+def holm_correction(p_values: list[float]) -> list[float]:
+    """Holm-Bonferroni step-down correction. Returns adjusted p-values."""
+    n = len(p_values)
+    indexed = sorted(enumerate(p_values), key=lambda x: x[1])
+    p_adj = [None] * n
+    running_max = 0.0
+    for rank, (orig_i, p) in enumerate(indexed):
+        adjusted = p * (n - rank)
+        adjusted = min(adjusted, 1.0)
+        running_max = max(running_max, adjusted)
+        p_adj[orig_i] = running_max
+    return p_adj
+
+
 def wilcoxon_comparison(
     y_true: np.ndarray,
     pred_a: np.ndarray,
@@ -158,29 +206,27 @@ def wilcoxon_comparison(
     model_b: str,
 ) -> dict:
     """
-    Wilcoxon signed-rank test comparing absolute errors of two models.
-    H0: median(|e_A| - |e_B|) = 0
+    S-07: Sign-flip permutation test (replaces Wilcoxon) + Holm correction applied upstream.
+    Returns raw p; caller applies Holm across all tests.
     """
-    ae_a = np.abs(y_true - pred_a)
-    ae_b = np.abs(y_true - pred_b)
+    ae_a = np.abs(np.array(y_true, dtype=float) - np.array(pred_a, dtype=float))
+    ae_b = np.abs(np.array(y_true, dtype=float) - np.array(pred_b, dtype=float))
     diffs = ae_a - ae_b
-    if np.all(diffs == 0):
-        return {
-            "test": "Wilcoxon signed-rank",
-            "model_a": model_a,
-            "model_b": model_b,
-            "statistic": 0.0,
-            "p_value": 1.0,
-            "significant_at_0.05": False,
-        }
-    stat, p = stats.wilcoxon(diffs, alternative="two-sided", zero_method="wilcox")
+    n_nonzero = int(np.sum(diffs != 0))
+
+    _, p_raw = sign_flip_permutation_test(
+        np.array(y_true, dtype=float),
+        np.array(pred_a, dtype=float),
+        np.array(pred_b, dtype=float),
+    )
     return {
-        "test": "Wilcoxon signed-rank",
+        "method": "sign_flip_permutation",
         "model_a": model_a,
         "model_b": model_b,
-        "statistic": round(float(stat), 4),
-        "p_value": round(float(p), 6),
-        "significant_at_0.05": bool(p < 0.05),
+        "p_raw": round(float(p_raw), 6),
+        "p_holm": None,
+        "n_nonzero_diff": n_nonzero,
+        "significant_at_0.05": False,
     }
 
 

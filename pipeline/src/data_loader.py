@@ -16,6 +16,8 @@ import yaml
 
 warnings.filterwarnings("ignore")
 
+_EMDAT_FLOW: dict = {}
+
 
 def load_config(config_path: str | Path) -> dict:
     with open(config_path, "r") as f:
@@ -90,19 +92,28 @@ def load_emdat(path: str | Path, cfg: dict) -> pd.DataFrame:
     df["start_month"] = df["start_month"].fillna(1).astype("Int64")
     df = df[df["start_year"].notna() & (df["start_year"] >= 2000)]
 
+    n_raw = len(df)
+
     physical_types = set(cfg["hazard_taxonomy"]["physical_types"])
     df = df[df["disaster_type"].isin(physical_types)].copy()
+    n_physical = len(df)
 
     df["deaths"] = df["deaths"].fillna(0)
     df["injured"] = df["injured"].fillna(0)
     df["total_affected"] = df["total_affected"].fillna(df["affected"].fillna(0))
-    # R-07: flag before zero-fill so downstream code can handle missingness explicitly
+    # flag before zero-fill so downstream code can handle missingness explicitly
     df["damage_missing"] = df["damage_usd_000"].isna().astype(int)
     df["damage_usd_000"] = df["damage_usd_000"].fillna(0)
 
     df = _compute_duration(df)
     df = _cluster_compound_events(df, cfg["hazard_taxonomy"]["compound_cluster_days"])
     df = df.reset_index(drop=True)
+    n_clustered = len(df)
+
+    _EMDAT_FLOW["raw_emdat_records"] = n_raw
+    _EMDAT_FLOW["physical_disasters_before_cluster"] = n_physical
+    _EMDAT_FLOW["physical_disasters_after_cluster"] = n_clustered
+
     return df
 
 
@@ -161,12 +172,11 @@ def _cluster_compound_events(df: pd.DataFrame, window_days: int) -> pd.DataFrame
         used.add(i)
 
         sub = df.loc[group]
-        # R-20: store all member types; mark composite_type="mixed" when they differ
         member_types = sub["disaster_type"].dropna().unique().tolist()
         composite_type = member_types[0] if len(member_types) == 1 else "mixed"
         merged = {
             "disaster_id": sub.iloc[0]["disaster_id"],
-            "disaster_type": composite_type,       # R-20: use "mixed" for composites
+            "disaster_type": composite_type,
             "disaster_subtype": sub.iloc[0].get("disaster_subtype", ""),
             "member_types": "; ".join(member_types),
             "start_date": sub["start_date"].min(),
@@ -177,7 +187,6 @@ def _cluster_compound_events(df: pd.DataFrame, window_days: int) -> pd.DataFrame
             "injured": sub["injured"].sum(),
             "total_affected": sub["total_affected"].sum(),
             "damage_usd_000": sub["damage_usd_000"].sum(),
-            # R-07: n_records_missing_damage for transparency
             "n_damage_missing": int(sub.get("damage_missing", pd.Series([0]*len(sub))).sum()),
             "duration_days": (
                 (sub["end_date"].max() - sub["start_date"].min()).days + 1

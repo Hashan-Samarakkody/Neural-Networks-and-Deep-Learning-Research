@@ -63,7 +63,7 @@ WORLD_BANK_ANNUAL = {
 
 _MACRO_CSV_PATH = Path(__file__).parent.parent / "data" / "raw" / "macro_indicators.csv"
 
-# Cache loaded from CSV; falls back to WORLD_BANK_ANNUAL if CSV not present (R-06).
+# Cache loaded from CSV; falls back to WORLD_BANK_ANNUAL if CSV not present.
 _macro_cache: dict | None = None
 
 
@@ -87,7 +87,7 @@ def _load_macro_cache() -> dict:
             raise ValueError(f"macro_indicators.csv missing indicators: {missing}")
         _macro_cache = cache
     else:
-        # Fallback to hardcoded dict (R-06: remove when CSV is complete)
+        # Fallback to hardcoded dict (remove when CSV is complete)
         _macro_cache = WORLD_BANK_ANNUAL
     return _macro_cache
 

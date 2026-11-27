@@ -95,6 +95,25 @@ def buffered_loocv_split(
     return splits
 
 
+def expanding_window_split(
+    df: pd.DataFrame,
+    start_year: int = 2012,
+    end_year: int = 2022,
+) -> list:
+    """
+    S-06: Expanding-window validation. Train on events up to year Y, test on Y+1.
+    Yields (train_idx, test_idx) for Y = start_year..end_year where both sets non-empty.
+    """
+    years = df["start_year"].values
+    splits = []
+    for y in range(start_year, end_year + 1):
+        train_idx = np.where(years <= y)[0]
+        test_idx = np.where(years == y + 1)[0]
+        if len(train_idx) >= 5 and len(test_idx) > 0:
+            splits.append((train_idx, test_idx))
+    return splits
+
+
 def leave_one_year_out_split(
     df: pd.DataFrame,
 ) -> list:
