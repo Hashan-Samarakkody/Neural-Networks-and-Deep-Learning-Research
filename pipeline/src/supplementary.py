@@ -47,7 +47,6 @@ def export_event_level_table(
             "disaster_id", "start_year", "start_month", "disaster_type", "disaster_subtype",
             "location", "deaths", "total_affected", "damage_usd_000", "duration_days",
             "n_events_clustered", "pre_disaster_baseline", "recovery_months", "is_right_censored",
-            # S-14: additional columns
             "confounded_by", "depth", "months_below_threshold", "pre_event_ratio",
             "n_reference_years_min", "damage_missing",
             "dtii_rule", "matched_district",

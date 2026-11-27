@@ -10,7 +10,6 @@ Combined rule:
 
 Hyperparameters are fixed (C=1, alpha=1) because the non-zero training
 subset in LOOCV has only ~12 events — too small for meaningful inner CV.
-# ponytail: fixed hparams; add nested CV when N_nonzero > 30
 """
 
 import numpy as np
@@ -30,7 +29,7 @@ def _fit(X_train: np.ndarray, y_train: np.ndarray):
     Xs = scaler.fit_transform(X_train)
     y_binary = (y_train > 0).astype(int)
     if len(np.unique(y_binary)) < 2:
-        # ponytail: single-class fallback; rare edge case in LOOCV folds near start
+        # single-class fallback; rare edge case in LOOCV folds near start
         clf = DummyClassifier(strategy="most_frequent")
     else:
         clf = LogisticRegression(C=1.0, max_iter=1000, random_state=SEED, solver="lbfgs")
@@ -76,7 +75,7 @@ def run_two_stage_split(
 
 
 def stage1_loocv_accuracy(X: np.ndarray, y: np.ndarray) -> dict:
-    """S-12: LOOCV accuracy + AUC + majority_rate for stage-1 classifier."""
+    """LOOCV accuracy + AUC + majority_rate for stage-1 classifier."""
     true_bin, pred_bin, pred_proba = [], [], []
     for train_idx, test_idx in LeaveOneOut().split(X):
         scaler, clf, _ = _fit(X[train_idx], y[train_idx])

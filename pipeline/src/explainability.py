@@ -181,7 +181,7 @@ def run_shap_analysis(
     return importance_df
 
 
-# ── R-19: permutation importance, grouped importance, VIF ────────────────────
+# ── Permutation importance, grouped importance, VIF ──────────────────────────
 
 # Correlated feature groups for grouped importance
 _FEATURE_GROUPS = {

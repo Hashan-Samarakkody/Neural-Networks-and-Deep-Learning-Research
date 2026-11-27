@@ -101,7 +101,7 @@ def load_emdat(path: str | Path, cfg: dict) -> pd.DataFrame:
     df["deaths"] = df["deaths"].fillna(0)
     df["injured"] = df["injured"].fillna(0)
     df["total_affected"] = df["total_affected"].fillna(df["affected"].fillna(0))
-    # R-07: flag before zero-fill so downstream code can handle missingness explicitly
+    # flag before zero-fill so downstream code can handle missingness explicitly
     df["damage_missing"] = df["damage_usd_000"].isna().astype(int)
     df["damage_usd_000"] = df["damage_usd_000"].fillna(0)
 
@@ -172,12 +172,11 @@ def _cluster_compound_events(df: pd.DataFrame, window_days: int) -> pd.DataFrame
         used.add(i)
 
         sub = df.loc[group]
-        # R-20: store all member types; mark composite_type="mixed" when they differ
         member_types = sub["disaster_type"].dropna().unique().tolist()
         composite_type = member_types[0] if len(member_types) == 1 else "mixed"
         merged = {
             "disaster_id": sub.iloc[0]["disaster_id"],
-            "disaster_type": composite_type,       # R-20: use "mixed" for composites
+            "disaster_type": composite_type,
             "disaster_subtype": sub.iloc[0].get("disaster_subtype", ""),
             "member_types": "; ".join(member_types),
             "start_date": sub["start_date"].min(),
@@ -188,7 +187,6 @@ def _cluster_compound_events(df: pd.DataFrame, window_days: int) -> pd.DataFrame
             "injured": sub["injured"].sum(),
             "total_affected": sub["total_affected"].sum(),
             "damage_usd_000": sub["damage_usd_000"].sum(),
-            # R-07: n_records_missing_damage for transparency
             "n_damage_missing": int(sub.get("damage_missing", pd.Series([0]*len(sub))).sum()),
             "duration_days": (
                 (sub["end_date"].max() - sub["start_date"].min()).days + 1

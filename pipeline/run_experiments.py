@@ -96,7 +96,7 @@ def _p(*args, **kwargs):
 
 
 def _get_regime(year: int, confounded_by: str = "") -> str:
-    """S-13: assign regime label to an event."""
+    """Assign regime label to an event."""
     if confounded_by and "civil_war_end" in str(confounded_by):
         return "confounded_civil_war"
     if 2019 <= year <= 2022:
@@ -107,7 +107,7 @@ def _get_regime(year: int, confounded_by: str = "") -> str:
 
 
 def _save_predictions(results: dict, df_events: pd.DataFrame, experiment_name: str, results_dir: Path):
-    """R-16 / S-13: save per-event predictions with regime column for all models."""
+    """Save per-event predictions with regime column for all models."""
     rows = []
     for model_name, res in results.items():
         for idx, (yt, yp) in enumerate(zip(res["y_true"], res["y_pred"])):
@@ -161,10 +161,9 @@ def main():
     _p("\n[2/6] Computing seasonally adjusted recovery targets...")
     df_all = build_recovery_targets(emdat, arrivals, cfg)
 
-    # R-03: drop events with insufficient baseline history
     n_insufficient = df_all["baseline_insufficient"].sum()
     if n_insufficient:
-        _p(f"      Dropping {n_insufficient} events with insufficient baseline history (R-03)")
+        _p(f"      Dropping {n_insufficient} events with insufficient baseline history")
         dropped = df_all[df_all["baseline_insufficient"]][["disaster_id", "start_year", "start_month"]]
         _p(f"      Dropped: {dropped.to_dict('records')}")
 
@@ -210,7 +209,6 @@ def main():
     _p(f"      Experiment A (pure natural hazards): N = {len(df_A)}")
     _p(f"      Experiment B (all events incl. shocks): N = {len(df_B)}")
 
-    # S-15 / R-04: event-flow table with correct raw count
     event_flow = {
         "raw_emdat_records": _EMDAT_FLOW.get("raw_emdat_records", len(emdat)),
         "physical_disasters_before_cluster": _EMDAT_FLOW.get("physical_disasters_before_cluster", len(emdat)),
@@ -223,7 +221,6 @@ def main():
         "exp_A_N": int(len(df_A)),
         "exp_B_N": int(len(df_B)),
     }
-    # S-15: arithmetic assertion on event flow
     _n_clustered = event_flow["physical_disasters_after_cluster"]
     _n_valid = event_flow["events_valid_target"]
     _n_insuff = event_flow["events_baseline_insufficient"]
@@ -258,10 +255,9 @@ def main():
     _p("\n      --- Experiment A Results ---")
     _p(summary_A[["Model", "MAE", "RMSE", "R2"]].to_string(index=False))
 
-    # R-16: save per-event predictions
     _save_predictions(results_A, df_A, "ExpA_LOOCV", results_dir)
 
-    # ── S-06: Additional validation schemes ───────────────────────────────
+    # ── Additional validation schemes ─────────────────────────────────────
     _p("\n[VAL] Additional validation schemes (buffered LOOCV / LOYO / expanding window)...")
     extra_summaries = []
     try:
@@ -323,10 +319,9 @@ def main():
     _p("\n      --- Experiment B Results ---")
     _p(summary_B[["Model", "MAE", "RMSE", "R2"]].to_string(index=False))
 
-    # R-16: save per-event predictions
     _save_predictions(results_B_eval, df_B.iloc[test_idx].reset_index(drop=True), "ExpB_Chronological", results_dir)
 
-    # ── S-04: Survival analysis ────────────────────────────────────────────
+    # ── Survival analysis ──────────────────────────────────────────────────
     _p("\n[SURV] Survival analysis (CoxPH + CoxnetAFT)...")
     from survival import export_survival_results
     surv_df = export_survival_results(df_B, cfg, train_idx, test_idx, results_dir)
@@ -348,7 +343,6 @@ def main():
             )
             tests.append(w)
             _p(f"      XGBoost vs {opponent}: p_raw={w['p_raw']}")
-    # S-07: apply Holm correction across all tests
     p_raws = [t["p_raw"] for t in tests]
     p_holms = holm_correction(p_raws)
     for t, ph in zip(tests, p_holms):
@@ -360,7 +354,6 @@ def main():
 
     # ── Save results ───────────────────────────────────────────────────────
     all_results = pd.concat([summary_A, summary_B] + extra_summaries, ignore_index=True)
-    # S-13: add regime distribution columns
     def _regime_counts(df_ev):
         regs = df_ev.apply(
             lambda r: _get_regime(int(r.get("start_year", 0)), str(r.get("confounded_by", ""))),
@@ -392,7 +385,6 @@ def main():
         ])
         pi_summary.to_csv(results_dir / "conformal_prediction_intervals.csv", index=False)
 
-    # R-04: save event-flow table
     with open(results_dir / "event_flow.json", "w") as f:
         json.dump(event_flow, f, indent=2)
     _p(f"\n      Event flow: {event_flow}")
@@ -412,7 +404,7 @@ def main():
             results_dir, "ExpA_LOOCV",
         )
 
-    # ── S-09: Feature diagnostics for Exp B ───────────────────────────────
+    # ── Feature diagnostics for Exp B ─────────────────────────────────────
     _p("\n[DIAG] Feature diagnostics (Exp B fold-safe vs full-sample reference)...")
     try:
         fb_B_diag = results_B.get("XGBoost", {}).get("feature_builder", fb_ref)
@@ -445,7 +437,6 @@ def main():
     xgb_model_B = results_B.get("XGBoost", {}).get("model", None)
     if xgb_model_B is not None:
         _p("\n      Running SHAP analysis on XGBoost (Experiment B)...")
-        # R-01: use training-fold features for SHAP
         fb_B = results_B["XGBoost"].get("feature_builder", fb_ref)
         X_B_train = fb_B.transform(df_B.iloc[train_idx])[FEATURE_COLS].values
         shap_df = run_shap_analysis(
@@ -460,8 +451,8 @@ def main():
 
     export_rq_summary(dist, summary_A, summary_B, tests_df, shap_df, results_dir)
 
-    # ── S-18: Permutation importance, VIF, grouped importance, ablation ───
-    _p("\n[IMP] S-18: permutation importance, VIF, grouped importance, ablation...")
+    # ── Permutation importance, VIF, grouped importance, ablation ─────────
+    _p("\n[IMP] Permutation importance, VIF, grouped importance, ablation...")
     try:
         from explainability import run_r19_analysis, run_ablation_no_index
         xgb_model_A_last = None
@@ -481,7 +472,7 @@ def main():
     except Exception as e:
         _p(f"      [WARN] S-18 analysis skipped: {e}")
 
-    # ── S-02: Baseline method comparison ──────────────────────────────────
+    # ── Baseline method comparison ─────────────────────────────────────────
     _p("\n[BASE] Baseline method comparison (seasonal_mean / seasonal_trend / yoy_growth)...")
     try:
         from baseline_counterfactual import build_recovery_targets as _brt
@@ -504,7 +495,7 @@ def main():
     except Exception as e:
         _p(f"      [WARN] Baseline method comparison skipped: {e}")
 
-    # ── S-01: Confounding sensitivity ─────────────────────────────────────
+    # ── Confounding sensitivity ────────────────────────────────────────────
     _p("\n[CONF] Confounding window sensitivity...")
     try:
         from xgboost import XGBRegressor as _XGB
@@ -525,7 +516,6 @@ def main():
         from sensitivity_analysis import run_full_sensitivity
         from xgboost import XGBRegressor
 
-        # R-15: use config default params, not last-fold params
         xgb_default_params = {}
 
         sens_cfg = cfg.get("sensitivity_analysis", {})
@@ -565,8 +555,8 @@ def main():
     with open(results_dir / "run_manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
-    # ── S-19: macro lag sensitivity ───────────────────────────────────────
-    _p("\n[MACLAG] S-19: macro_lag_years sensitivity (GDP lag 0/1/2)...")
+    # ── Macro lag sensitivity ──────────────────────────────────────────────
+    _p("\n[MACLAG] macro_lag_years sensitivity (GDP lag 0/1/2)...")
     try:
         from feature_engineering import get_macro_features, FEATURE_COLS as FC
         from sklearn.metrics import mean_absolute_error as _mae
@@ -609,7 +599,6 @@ def main():
     except Exception as e:
         _p(f"      [WARN] macro_lag sensitivity skipped: {e}")
 
-    # ── S-10: paper_numbers.json ───────────────────────────────────────────
     try:
         from paper_numbers import extract_paper_numbers
         pn = extract_paper_numbers(results_dir)

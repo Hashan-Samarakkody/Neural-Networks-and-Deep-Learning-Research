@@ -72,7 +72,7 @@ def compute_baseline(
 
     def _baseline_for_month(target_month: int, target_year: int) -> float:
         valid_years = []
-        # Never use disaster_year or later as reference (R-03: no future leakage)
+        # Never use disaster_year or later as reference (no future leakage)
         y = min(target_year - 1, disaster_year - 1)
         while len(valid_years) < K:
             if y < arrivals["year"].min():
@@ -125,7 +125,7 @@ def compute_recovery_months(
     extras contains: depth, months_below_threshold, pre_event_ratio.
     T_rec = 0  if month immediately after disaster meets threshold
     T_rec = 12 if recovery not achieved within max_months (right-censored)
-    persistence: consecutive months above threshold required (S-03).
+    persistence: consecutive months above threshold required.
     """
     if crisis_years is None:
         crisis_years = CRISIS_YEARS
@@ -242,7 +242,7 @@ def build_recovery_targets(
         n_reference_years_min, baseline_insufficient
     baseline_insufficient=True when fewer than baseline.min_reference_years
     non-crisis reference years exist for any post-disaster offset; those events
-    get recovery_months=NaN and are dropped before modelling (R-03).
+    get recovery_months=NaN and are dropped before modelling.
     """
     K = cfg["experiment"]["baseline_window_years"]
     threshold = cfg["experiment"]["recovery_threshold"]

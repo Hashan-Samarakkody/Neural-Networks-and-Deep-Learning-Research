@@ -98,7 +98,6 @@ class TestRecoveryMonths:
             K=3, threshold=0.90, max_months=12,
             crisis_years={2009, 2010, 2011},
         )
-        # R-03: returns 0.0 when no valid reference years (no fallback to all-years mean)
         assert baselines[1] == pytest.approx(0.0)
 
     def test_december_onset_month_rollover(self):
@@ -474,10 +473,10 @@ class TestIntegration:
         assert len(test_idx) > 0
 
 
-# ── S-20: persistence rule ────────────────────────────────────────────────────
+# ── Persistence rule ──────────────────────────────────────────────────────────
 
 class TestRecoveryPersistence:
-    """S-03: persistence=N requires N consecutive months above threshold."""
+    """persistence=N requires N consecutive months above threshold."""
 
     def test_persistence_2_delays_recovery(self):
         """Single above-threshold month does not satisfy persistence=2."""
@@ -522,10 +521,10 @@ class TestRecoveryPersistence:
         assert censored is False
 
 
-# ── S-20: trend / yoy baseline methods ───────────────────────────────────────
+# ── Trend / yoy baseline methods ─────────────────────────────────────────────
 
 class TestBaselineMethods:
-    """S-02: seasonal_trend and yoy_growth baseline variants return valid floats."""
+    """seasonal_trend and yoy_growth baseline variants return valid floats."""
 
     def test_seasonal_trend_baseline_positive(self):
         from baseline_counterfactual import compute_baseline
@@ -568,10 +567,10 @@ class TestBaselineMethods:
             )
 
 
-# ── S-20: block bootstrap block_events param ─────────────────────────────────
+# ── Block bootstrap block_events param ───────────────────────────────────────
 
 class TestBlockBootstrap:
-    """S-08: block_events parameter controls overlapping block size."""
+    """block_events parameter controls overlapping block size."""
 
     def _make_preds(self, n=20, seed=0):
         rng = np.random.default_rng(seed)
@@ -608,10 +607,10 @@ class TestBlockBootstrap:
         assert lo >= 0 and hi >= lo
 
 
-# ── S-20: Holm correction ─────────────────────────────────────────────────────
+# ── Holm correction ───────────────────────────────────────────────────────────
 
 class TestHolmCorrection:
-    """S-07: Holm-Bonferroni adjusted p-values >= raw p-values and monotone."""
+    """Holm-Bonferroni adjusted p-values >= raw p-values and monotone."""
 
     def test_holm_geq_raw(self):
         from evaluate import holm_correction

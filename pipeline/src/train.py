@@ -6,14 +6,14 @@ Models:
 
 Naive baselines:
     NaiveMean, NaiveMedian,
-    NaivePrevious_Oracle  — previous event T_rec (look-ahead, non-ex-ante; R-09)
-    NaiveLastKnown        — most recent event whose 12-month window closed (ex-ante; R-09)
+    NaivePrevious_Oracle  — previous event T_rec (look-ahead, non-ex-ante)
+    NaiveLastKnown        — most recent event whose 12-month window closed (ex-ante)
 
-Nested CV (R-01, R-08):
+Nested CV:
     Inner folds: KFold without shuffle (preserves temporal order).
     Model scaler inside sklearn Pipeline so inner CV refits scaler on each inner split.
     Outer loop: LOOCV (Exp A) or single chronological split (Exp B).
-    FeatureBuilder fit inside every outer fold on training indices only (R-01).
+    FeatureBuilder fit inside every outer fold on training indices only.
 """
 
 import os
@@ -82,7 +82,7 @@ def tune_model(
     """
     Inner-fold RandomizedSearchCV.
 
-    Model scaler is inside a sklearn Pipeline (R-01) so the inner CV refits
+    Model scaler is inside a sklearn Pipeline so the inner CV refits
     the scaler on each inner training split, not on the outer training fold.
     Returns (best_estimator, best_params_stripped, None).
     scaler=None because Pipeline owns the scaler.
@@ -90,7 +90,7 @@ def tune_model(
     meta = MODEL_REGISTRY[name]
     param_grid = _build_param_grid(cfg, meta["grid_key"])
 
-    # R-08: no shuffle — preserve temporal order inside inner folds
+    # no shuffle — preserve temporal order inside inner folds
     inner_cv = KFold(n_splits=n_inner_splits, shuffle=False)
 
     if meta["needs_scaling"]:
@@ -144,7 +144,7 @@ def run_loocv(
     """
     Full LOOCV for Experiment A (pure natural hazards).
 
-    Fits FeatureBuilder inside every fold on training indices only (R-01).
+    Fits FeatureBuilder inside every fold on training indices only.
     TwoStage model is integrated here so it also uses fold-safe features.
 
     Returns {model_name: {"y_true", "y_pred", "best_params"}}.
@@ -256,7 +256,7 @@ def run_multisplit(
     n_inner_splits: int = 5,
 ) -> dict:
     """
-    S-06: Generic multi-split runner for buffered LOOCV, LOYO, expanding-window.
+    Generic multi-split runner for buffered LOOCV, LOYO, expanding-window.
 
     splits: list of (train_idx, test_idx) arrays.
     Returns {model_name: {"y_true", "y_pred", "best_params"}}.
@@ -302,8 +302,8 @@ def naive_baselines_loocv(y: np.ndarray, df: pd.DataFrame = None) -> dict:
     Naive baselines under LOOCV.
 
     NaiveMean, NaiveMedian: leave-one-out mean/median of remaining events.
-    NaivePrevious_Oracle: previous event T_rec (non-ex-ante look-ahead; R-09).
-    NaiveLastKnown: T_rec of most recent event whose window closed before onset (R-09).
+    NaivePrevious_Oracle: previous event T_rec (non-ex-ante look-ahead).
+    NaiveLastKnown: T_rec of most recent event whose window closed before onset.
     """
     results = {
         "NaiveMean": {"y_true": [], "y_pred": []},
@@ -325,14 +325,14 @@ def naive_baselines_loocv(y: np.ndarray, df: pd.DataFrame = None) -> dict:
         results["NaiveMedian"]["y_true"].append(y[i])
         results["NaiveMedian"]["y_pred"].append(float(np.median(other)))
 
-        # Oracle: previous by index (may be future-peeking; R-09)
+        # Oracle: previous by index (may be future-peeking)
         prev_oracle = float(y[i - 1]) if i > 0 else float(np.mean(other))
         results["NaivePrevious_Oracle"]["y_true"].append(y[i])
         results["NaivePrevious_Oracle"]["y_pred"].append(prev_oracle)
 
         # LastKnown: most recent event j < i whose 12-month window closed
         if onsets is not None:
-            lk_pred = float("nan")  # R-09: NaN when no prior closed window
+            lk_pred = float("nan")  # NaN when no prior closed window
             current_onset = onsets[i]
             for j in range(i - 1, -1, -1):
                 if j == i:
@@ -383,7 +383,6 @@ def naive_baselines_split(
         },
         "NaivePrevious_Oracle": {
             "y_true": y_test.tolist(),
-            # ponytail: constant (y_train[-1]) per R-09 — not ex-ante but kept for comparison
             "y_pred": [float(y_train[-1])] * n_test,
         },
         "NaiveLastKnown": {
