@@ -1,0 +1,25 @@
+From 096b3179290825d18fc255cdf6578d2d7bb9ae8c Mon Sep 17 00:00:00 2001
+From: assistant <a@b>
+Date: Fri, 27 Nov 2026 08:02:38 +0000
+Subject: [PATCH 2/2] docs: fix version sensitivity wording
+
+---
+ pipeline/docs/VERSION_SENSITIVITY.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/pipeline/docs/VERSION_SENSITIVITY.md b/pipeline/docs/VERSION_SENSITIVITY.md
+index 9e84ebf..b7c6e3f 100644
+--- a/pipeline/docs/VERSION_SENSITIVITY.md
++++ b/pipeline/docs/VERSION_SENSITIVITY.md
+@@ -18,7 +18,7 @@ Run 2 (pinned environment, Linux). Every model except XGBoost reproduced to four
+ 
+ Holm-adjusted permutation p-values of XGBoost against each comparator also changed (for example against the random forest 0.58 in run 1 and 1.00
+ in run 2; against the two-stage model 1.00 and 0.94); the comparisons with the mean baseline, the last-known baseline and Ridge stayed significant.
+-SHAP values changed (global tourism index 0.53 versus 0.58); its rank among features did not.
++SHAP values changed (global tourism index 0.53 versus 0.58); the top-ranked feature did not change.
+ 
+ ## Rules
+ 
+-- 
+2.43.0
+

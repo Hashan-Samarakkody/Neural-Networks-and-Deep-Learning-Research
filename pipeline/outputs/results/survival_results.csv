@@ -1,3 +1,7 @@
-model,c_index,integrated_brier_score,note
-CoxPH,,,x must be within [0.000000; 9.000000]
-CoxnetAFT,,,x must be within [0.000000; 9.000000]
+experiment,model,c_index,integrated_brier_score,n_train,n_test,n_test_censored,note
+ExpB_Chronological,CoxPH,0.6882,0.3189,37,23,10,IBS over months 2-9; test censored at 9.5
+ExpB_Chronological,RandomSurvivalForest,0.5699,0.3667,37,23,10,IBS over months 2-9; test censored at 9.5
+ExpB_Chronological,DiscreteHazard,0.8898,0.1104,37,23,10,IBS over months 2-9; test censored at 9.5
+ExpA_LOOCV,CoxPH,0.9552,,45,46,0,no censored events in Experiment A; IBS not defined
+ExpA_LOOCV,RandomSurvivalForest,0.8483,,45,46,0,no censored events in Experiment A; IBS not defined
+ExpA_LOOCV,DiscreteHazard,0.8495,,45,46,0,no censored events in Experiment A; IBS not defined

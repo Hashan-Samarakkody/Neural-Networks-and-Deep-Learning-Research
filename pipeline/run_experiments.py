@@ -26,27 +26,42 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 PINNED = {
-    "xgboost": ("2.1.1", "!="),   # != means warn if differs
-    "numpy": ("2.0.2", "!="),
-    "shap": ("0.46.0", "!="),
+    "pandas": "2.2.2", "numpy": "2.0.2", "scikit-learn": "1.5.2", "xgboost": "2.1.1",
+    "shap": "0.46.0", "matplotlib": "3.9.2", "scipy": "1.14.1", "scikit-survival": "0.23.1",
 }
 
 
 def _assert_versions():
-    import importlib.metadata
+    """Abort unless every library has the pinned version (set ALLOW_VERSION_MISMATCH=1 to override)."""
+    import importlib.metadata, os
     mismatches = []
-    for pkg, (expected, op) in PINNED.items():
+    for pkg, expected in PINNED.items():
         try:
             actual = importlib.metadata.version(pkg)
         except importlib.metadata.PackageNotFoundError:
             actual = "not installed"
-        if op == "!=" and actual != expected:
-            mismatches.append(f"  {pkg}: expected {expected}, got {actual}")
+        if actual != expected:
+            mismatches.append(f"  {pkg}: pinned {expected}, installed {actual}")
     if mismatches:
-        print("[VERSION WARNING] Library versions differ from frozen run:")
-        for m in mismatches:
-            print(m)
-        print("  Results may not reproduce exactly. See docs/VERSION_SENSITIVITY.md")
+        msg = "Library versions differ from requirements.txt:\n" + "\n".join(mismatches)
+        if os.environ.get("ALLOW_VERSION_MISMATCH") == "1":
+            print("[VERSION WARNING] " + msg + "\n  Override active: results are NOT the frozen results. See docs/VERSION_SENSITIVITY.md")
+            return False
+        print("[VERSION ERROR] " + msg + "\n  Install with: pip install -r requirements.txt")
+        sys.exit(2)
+    return True
+
+
+def _cached(name, fn):
+    """Checkpoint expensive stages (outputs/cache, git-ignored) so an interrupted run can resume."""
+    import pickle
+    cdir = ROOT / "outputs" / "cache"; cdir.mkdir(parents=True, exist_ok=True)
+    f = cdir / f"{name}.pkl"
+    if f.exists():
+        return pickle.loads(f.read_bytes())
+    out = fn()
+    f.write_bytes(pickle.dumps(out))
+    return out
 
 
 def _get_commit_hash() -> str:
@@ -70,7 +85,7 @@ from validation import (
 )
 from train import (
     run_loocv, run_chronological_split, run_multisplit,
-    naive_baselines_loocv, naive_baselines_split,
+    naive_baselines_loocv, naive_baselines_split, naive_baselines_multisplit,
 )
 from evaluate import (
     summarize_experiment, conformal_pi_from_loocv, wilcoxon_comparison,
@@ -78,6 +93,9 @@ from evaluate import (
 )
 from explainability import run_shap_analysis
 from confounding import flag_confounded_events, run_confounding_variants
+from paper_extras import compute_paper_extras
+from make_paper_figures import make_figure1
+from default_models import loocv_default_xgb, loo_zero_baseline, permutation_importance_loocv, run_ablation
 from supplementary import (
     export_event_level_table, export_correlation_matrix,
     export_target_distribution_plot, export_rq_summary,
@@ -141,7 +159,7 @@ def main():
     _p("Conformal PI | Nested CV | 8 features | No data leakage")
     _p("=" * 70)
 
-    _assert_versions()
+    versions_pinned = _assert_versions()
     run_start = datetime.utcnow()
     cfg = load_config(CFG_PATH)
     figures_dir = ROOT / cfg["paths"]["figures_dir"]
@@ -202,6 +220,8 @@ def main():
     mask_clean = ~df_with_targets["start_year"].isin(crisis_years)
     df_A = df_with_targets[mask_clean].reset_index(drop=True)
     df_B = df_with_targets.reset_index(drop=True)
+    df_A = flag_confounded_events(df_A, cfg)
+    df_B = flag_confounded_events(df_B, cfg)
     y_A = df_A["recovery_months"].values
     y_B = df_B["recovery_months"].values
     X_A = df_feat_ref[mask_clean.values][FEATURE_COLS].values
@@ -231,7 +251,7 @@ def main():
 
     # ── 4. Experiment A (LOOCV) ────────────────────────────────────────────
     _p("\n[4/6] Experiment A -- LOOCV on pure natural hazards...")
-    results_A = run_loocv(df_A, cfg)   # TwoStage integrated; fold-safe FeatureBuilder
+    results_A = _cached('results_A', lambda: run_loocv(df_A, cfg))   # TwoStage integrated; fold-safe FeatureBuilder
     naive_A = naive_baselines_loocv(y_A, df=df_A)
     results_A.update(naive_A)
 
@@ -263,21 +283,24 @@ def main():
     try:
         buf_splits = buffered_loocv_split(df_A, buffer_months=12)
         _p(f"      Buffered LOOCV: {len(buf_splits)} folds")
-        res_buf = run_multisplit(df_A, buf_splits, cfg)
+        res_buf = _cached('res_buf', lambda: run_multisplit(df_A, buf_splits, cfg))
+        res_buf.update(naive_baselines_multisplit(df_A, buf_splits))
         extra_summaries.append(summarize_experiment(res_buf, "ExpA_BufferedLOOCV"))
     except Exception as e:
         _p(f"      [WARN] Buffered LOOCV skipped: {e}")
     try:
         loyo_splits = leave_one_year_out_split(df_A)
         _p(f"      LOYO: {len(loyo_splits)} folds")
-        res_loyo = run_multisplit(df_A, loyo_splits, cfg)
+        res_loyo = _cached('res_loyo', lambda: run_multisplit(df_A, loyo_splits, cfg))
+        res_loyo.update(naive_baselines_multisplit(df_A, loyo_splits))
         extra_summaries.append(summarize_experiment(res_loyo, "ExpA_LOYO"))
     except Exception as e:
         _p(f"      [WARN] LOYO skipped: {e}")
     try:
         ew_splits = expanding_window_split(df_A)
         _p(f"      Expanding window: {len(ew_splits)} folds")
-        res_ew = run_multisplit(df_A, ew_splits, cfg)
+        res_ew = _cached('res_ew', lambda: run_multisplit(df_A, ew_splits, cfg))
+        res_ew.update(naive_baselines_multisplit(df_A, ew_splits))
         extra_summaries.append(summarize_experiment(res_ew, "ExpA_ExpandingWindow"))
     except Exception as e:
         _p(f"      [WARN] Expanding window skipped: {e}")
@@ -292,7 +315,7 @@ def main():
     )
     _p(f"      Train N={len(train_idx)}, Test N={len(test_idx)}")
 
-    results_B = run_chronological_split(df_B, train_idx, test_idx, cfg)
+    results_B = _cached('results_B', lambda: run_chronological_split(df_B, train_idx, test_idx, cfg))
     naive_B = naive_baselines_split(
         y_B[train_idx], y_B[test_idx],
         df_train=df_B.iloc[train_idx], df_test=df_B.iloc[test_idx],
@@ -322,10 +345,12 @@ def main():
     _save_predictions(results_B_eval, df_B.iloc[test_idx].reset_index(drop=True), "ExpB_Chronological", results_dir)
 
     # ── Survival analysis ──────────────────────────────────────────────────
-    _p("\n[SURV] Survival analysis (CoxPH + CoxnetAFT)...")
-    from survival import export_survival_results
-    surv_df = export_survival_results(df_B, cfg, train_idx, test_idx, results_dir)
-    _p(f"      Survival models: {surv_df[['model','c_index','integrated_brier_score']].to_string(index=False)}")
+    _p("\n[SURV] Survival analysis (CoxPH, RandomSurvivalForest, DiscreteHazard)...")
+    from survival import run_survival_experiments
+    surv_df = run_survival_experiments(df_A, df_B, train_idx, test_idx, cfg, results_dir)
+    _p(surv_df[["experiment", "model", "c_index", "integrated_brier_score"]].to_string(index=False))
+    if surv_df["c_index"].isna().all():
+        raise RuntimeError("All survival models failed; see survival_results.csv notes")
 
     # ── 6. Wilcoxon tests ──────────────────────────────────────────────────
     _p("\n[6/6] Wilcoxon signed-rank tests...")
@@ -392,8 +417,12 @@ def main():
     # ── Supplementary outputs ──────────────────────────────────────────────
     _p("\n[SUPP] Supplementary outputs...")
     X_df = pd.DataFrame(X_ref, columns=FEATURE_COLS)
-    export_event_level_table(df_B, X_df, results_dir)
-    export_dtii_report(df_B, results_dir)
+    df_B_ev = df_B.copy()
+    for c in ("matched_district", "dtii_rule", "DTII", "TWDI"):
+        if c in df_feat_ref.columns:
+            df_B_ev[c] = df_feat_ref[c].values
+    export_event_level_table(df_B_ev, X_df, results_dir)
+    export_dtii_report(df_B_ev, results_dir)
     export_correlation_matrix(X_df, results_dir, figures_dir)
     export_target_distribution_plot(y_B, figures_dir, dist)
 
@@ -454,7 +483,7 @@ def main():
     # ── Permutation importance, VIF, grouped importance, ablation ─────────
     _p("\n[IMP] Permutation importance, VIF, grouped importance, ablation...")
     try:
-        from explainability import run_r19_analysis, run_ablation_no_index
+        from explainability import run_r19_analysis
         xgb_model_A_last = None
         # Use Exp B XGBoost for permutation importance (has held-out test set)
         if xgb_model_B is not None:
@@ -467,72 +496,55 @@ def main():
                 results_dir, "ExpB", "XGBoost",
             )
             _p("      permutation_importance_ExpB_XGBoost.csv, grouped_importance.csv, vif.csv written.")
-        abl_df = run_ablation_no_index(df_A, cfg, results_dir, seed=SEED)
-        _p(f"      ablation_no_index.csv: MAE={abl_df['MAE'].iloc[0]}")
+        abl_df = run_ablation(df_A, cfg, results_dir, seed=SEED)
+        _p("      ablation_features.csv:\n" + abl_df[["variant", "MAE", "R2"]].to_string(index=False))
+        perm_A = permutation_importance_loocv(df_A, cfg, seed=SEED)
+        perm_A.to_csv(results_dir / "permutation_importance_ExpA_XGBoost.csv", index=False)
+        _p("      permutation_importance_ExpA_XGBoost.csv written.")
     except Exception as e:
-        _p(f"      [WARN] S-18 analysis skipped: {e}")
+        raise RuntimeError(f"importance/ablation step failed: {e}") from e
 
     # ── Baseline method comparison ─────────────────────────────────────────
     _p("\n[BASE] Baseline method comparison (seasonal_mean / seasonal_trend / yoy_growth)...")
-    try:
-        from baseline_counterfactual import build_recovery_targets as _brt
-        base_rows = []
-        for bmethod in ["seasonal_mean", "seasonal_trend", "yoy_growth"]:
-            cfg_b = {**cfg, "baseline": {**cfg.get("baseline", {}), "method": bmethod}}
-            df_bm = _brt(emdat, arrivals, cfg_b)
-            df_bm = df_bm[~df_bm["baseline_insufficient"]].dropna(subset=["recovery_months"])
-            y_bm = df_bm["recovery_months"].values
-            base_rows.append({
-                "method": bmethod,
-                "n_events": len(y_bm),
-                "median_recovery": float(np.median(y_bm)),
-                "mean_recovery": round(float(np.mean(y_bm)), 3),
-                "n_right_censored": int(np.sum(y_bm == 12)),
-                "n_zero": int(np.sum(y_bm == 0)),
-            })
-            _p(f"      {bmethod}: N={len(y_bm)} median={np.median(y_bm):.1f} mean={np.mean(y_bm):.2f}")
-        pd.DataFrame(base_rows).to_csv(results_dir / "baseline_method_comparison.csv", index=False)
-    except Exception as e:
-        _p(f"      [WARN] Baseline method comparison skipped: {e}")
+    from baseline_counterfactual import build_recovery_targets as _brt
+    base_rows = []
+    ids_A = set(df_A["disaster_id"])
+    for bmethod in ["seasonal_mean", "seasonal_trend", "yoy_growth"]:
+        cfg_b = {**cfg, "baseline": {**cfg.get("baseline", {}), "method": bmethod}}
+        df_bm = _brt(emdat, arrivals, cfg_b)
+        df_bm = df_bm[~df_bm["baseline_insufficient"]].dropna(subset=["recovery_months"]).sort_values("start_date").reset_index(drop=True)
+        y_bm = df_bm["recovery_months"].values
+        df_bmA = df_bm[df_bm["disaster_id"].isin(ids_A)].reset_index(drop=True)
+        yA_bm = df_bmA["recovery_months"].values
+        xr = loocv_default_xgb(df_bmA, cfg, seed=SEED)
+        zr = loo_zero_baseline(yA_bm)
+        base_rows.append({
+            "method": bmethod, "n_events": len(y_bm), "median_recovery": float(np.median(y_bm)),
+            "mean_recovery": round(float(np.mean(y_bm)), 3), "n_right_censored": int(np.sum(y_bm == 12)),
+            "n_zero": int(np.sum(y_bm == 0)), "ExpA_N": int(len(yA_bm)),
+            "ExpA_zero_share": round(float(np.mean(yA_bm == 0)), 4), "ExpA_n_censored": int(np.sum(yA_bm == 12)),
+            "ExpA_XGBoost_default_MAE": xr["MAE"], "ExpA_XGBoost_default_R2": xr["R2"],
+            "ExpA_median_baseline_MAE": zr["MAE"],
+        })
+        _p(f"      {bmethod}: zero={base_rows[-1]['n_zero']} cens={base_rows[-1]['n_right_censored']} XGB-default MAE={xr['MAE']}")
+    base_df = pd.DataFrame(base_rows)
+    base_df.to_csv(results_dir / "baseline_method_comparison.csv", index=False)
 
     # ── Confounding sensitivity ────────────────────────────────────────────
     _p("\n[CONF] Confounding window sensitivity...")
-    try:
-        from xgboost import XGBRegressor as _XGB
-        df_A_flagged = flag_confounded_events(df_A, cfg)
-        conf_df = run_confounding_variants(
-            df_A_flagged, X_A, y_A, cfg, _XGB, {}, results_dir, seed=SEED,
-        )
-        _p(f"      Confounding variants: {conf_df[['variant','n_events','MAE','R2']].to_string(index=False)}")
-        # Carry confounded_by back for event table
-        df_A = df_A_flagged
-        df_B = flag_confounded_events(df_B, cfg)
-    except Exception as e:
-        _p(f"      [WARN] Confounding sensitivity skipped: {e}")
+    conf_df = run_confounding_variants(df_A, cfg, results_dir, seed=SEED)
+    _p(conf_df[["variant", "n_events", "MAE", "R2", "MAE_median_baseline"]].to_string(index=False))
 
     # ── Sensitivity analysis ───────────────────────────────────────────────
-    _p("\n[SENS] Sensitivity analysis (threshold x baseline window)...")
-    try:
-        from sensitivity_analysis import run_full_sensitivity
-        from xgboost import XGBRegressor
-
-        xgb_default_params = {}
-
-        sens_cfg = cfg.get("sensitivity_analysis", {})
-        sens_df = run_full_sensitivity(
-            X_A, y_A, df_A, arrivals,
-            XGBRegressor, xgb_default_params,
-            thresholds=sens_cfg.get("thresholds", [0.80, 0.90, 1.00]),
-            baseline_windows=sens_cfg.get("baseline_windows", [3, 6, 12]),
-            crisis_years=crisis_years,
-            results_dir=results_dir,
-            seed=SEED,
-            persistence_values=sens_cfg.get("persistence_values", [1]),
-        )
-        _p(f"      Sensitivity grid: {len(sens_df)} combinations.")
-    except Exception as e:
-        _p(f"      [WARN] Sensitivity analysis skipped: {e}")
-        traceback.print_exc()
+    _p("\n[SENS] Sensitivity analysis (threshold x baseline window x persistence)...")
+    from sensitivity_analysis import run_full_sensitivity
+    sens_cfg = cfg["sensitivity_analysis"]
+    sens_df = run_full_sensitivity(
+        df_A, arrivals, cfg, crisis_years,
+        thresholds=sens_cfg["thresholds"], baseline_windows=sens_cfg["baseline_windows"],
+        persistence_values=sens_cfg["persistence_values"], results_dir=results_dir, seed=SEED,
+    )
+    _p(f"      Sensitivity grid: {len(sens_df)} combinations.")
 
     # ── Run manifest ───────────────────────────────────────────────────────
     import platform, importlib.metadata
@@ -548,63 +560,45 @@ def main():
         "run_duration_seconds": (run_end - run_start).total_seconds(),
         "packages": {
             p: importlib.metadata.version(p)
-            for p in ["pandas", "numpy", "scikit-learn", "xgboost", "shap", "scipy"]
-            if importlib.metadata.version(p)
+            for p in ["pandas", "numpy", "scikit-learn", "xgboost", "shap", "scipy", "scikit-survival", "matplotlib"]
         },
+        "pinned_versions_ok": bool(versions_pinned),
     }
     with open(results_dir / "run_manifest.json", "w") as f:
         json.dump(manifest, f, indent=2)
 
     # ── Macro lag sensitivity ──────────────────────────────────────────────
-    _p("\n[MACLAG] macro_lag_years sensitivity (GDP lag 0/1/2)...")
-    try:
-        from feature_engineering import get_macro_features, FEATURE_COLS as FC
-        from sklearn.metrics import mean_absolute_error as _mae
-        import xgboost as _xgb
-        from preprocess import FeatureBuilder as _FB
-        from sklearn.model_selection import LeaveOneOut as _LOO
+    _p("\n[MACLAG] GDP-growth lag sensitivity (0/1/2 years), default-setting XGBoost...")
+    lag_rows = []
+    for lag in [0, 1, 2]:
+        r = loocv_default_xgb(df_A, cfg, gdp_lag=lag, seed=SEED)
+        lag_rows.append({"gdp_lag_years": lag, "MAE": r["MAE"], "RMSE": r["RMSE"], "R2": r["R2"], "n_events": r["N"]})
+        _p(f"      gdp_lag={lag}: MAE={r['MAE']}")
+    pd.DataFrame(lag_rows).to_csv(results_dir / "macro_lag_sensitivity.csv", index=False)
 
-        lag_rows = []
-        for lag in [0, 1, 2]:
-            # Build feature matrix with shifted GDP year
-            df_lag = df_A.copy()
-            gdp_lag = []
-            for _, row in df_lag.iterrows():
-                try:
-                    m = get_macro_features(int(row["start_year"]) - lag)
-                    gdp_lag.append(m.get("gdp_growth", 0.0))
-                except KeyError:
-                    gdp_lag.append(0.0)
-            df_lag["gdp_growth_lag"] = gdp_lag
+    # Consistency: the same nominal setting must give the same number in every analysis
+    main_sens = float(sens_df[sens_df.is_main_setting].MAE.iloc[0])
+    ref_vals = {
+        "sensitivity main cell": main_sens,
+        "confounding all": float(conf_df[conf_df.variant == "all"].MAE.iloc[0]),
+        "ablation full": float(abl_df[abl_df.variant == "full"].MAE.iloc[0]),
+        "macro lag 0": float(lag_rows[0]["MAE"]),
+        "baseline comparison seasonal_mean": float(base_df[base_df.method == "seasonal_mean"].ExpA_XGBoost_default_MAE.iloc[0]),
+    }
+    assert max(ref_vals.values()) - min(ref_vals.values()) < 1e-9, f"Default-XGBoost analyses disagree: {ref_vals}"
+    _p(f"      Consistency check passed: default-setting XGBoost MAE = {main_sens} in all analyses.")
 
-            # Quick LOOCV with XGBoost using modified gdp_growth
-            fb_l = _FB(cfg)
-            fb_l.fit(df_lag)
-            df_feat_l = fb_l.transform(df_lag)
-            df_feat_l["gdp_growth"] = df_lag["gdp_growth_lag"].values
-            X_l = df_feat_l[FC].values
-            y_l = y_A
+    # Paper statistics, Figure 1 and paper_numbers.json
+    compute_paper_extras(df_B, df_A, train_idx, test_idx, arrivals, cfg, results_dir)
+    make_figure1(results_dir, figures_dir)
+    _p("      paper_extras.json and figure1.{svg,pdf,png} written.")
 
-            loo_p, loo_t = [], []
-            for tr, te in _LOO().split(X_l):
-                m_xgb = _xgb.XGBRegressor(random_state=SEED, verbosity=0, nthread=1)
-                m_xgb.fit(X_l[tr], y_l[tr])
-                loo_p.append(float(np.clip(m_xgb.predict(X_l[te])[0], 0, 12)))
-                loo_t.append(float(y_l[te[0]]))
-            lag_mae = round(float(_mae(loo_t, loo_p)), 4)
-            lag_rows.append({"gdp_lag_years": lag, "MAE": lag_mae, "n_events": len(y_l)})
-            _p(f"      gdp_lag={lag}: MAE={lag_mae}")
+    from paper_numbers import extract_paper_numbers
+    pn = extract_paper_numbers(results_dir)
+    _p(f"\n[PAPER] paper_numbers.json written ({len(pn)} keys).")
 
-        pd.DataFrame(lag_rows).to_csv(results_dir / "macro_lag_sensitivity.csv", index=False)
-    except Exception as e:
-        _p(f"      [WARN] macro_lag sensitivity skipped: {e}")
-
-    try:
-        from paper_numbers import extract_paper_numbers
-        pn = extract_paper_numbers(results_dir)
-        _p(f"\n[PAPER] paper_numbers.json written ({len(pn)} keys).")
-    except Exception as e:
-        _p(f"      [WARN] paper_numbers.json skipped: {e}")
+    from make_readme import main as _readme
+    _readme(results_dir)
 
     _p("\n" + "=" * 70)
     _p("Pipeline complete. Outputs written to:")

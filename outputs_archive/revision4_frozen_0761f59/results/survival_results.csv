@@ -1,0 +1,3 @@
+model,c_index,integrated_brier_score,note
+CoxPH,,,x must be within [0.000000; 9.000000]
+CoxnetAFT,,,x must be within [0.000000; 9.000000]

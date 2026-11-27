@@ -1,226 +1,75 @@
 """
-Sensitivity analysis: vary recovery threshold and baseline window.
+Sensitivity analysis: recovery threshold x baseline window x persistence.
 
-Tests robustness of findings across:
-    - Recovery thresholds: 0.80, 0.90, 1.00 (main = 0.90)
-    - Baseline windows: 3, 6, 12 non-crisis reference years (main = 3)
-
-Exports CSV comparing MAE/RMSE/R2 across all combinations for best model.
+Targets are recomputed with the same function as the main pipeline
+(baseline_counterfactual.compute_recovery_months), so the baseline rule, the
+no-future-years rule and the persistence rule are identical. Each cell is evaluated
+with the shared default-setting XGBoost LOOCV (default_models) and with the LOO
+median baseline. Output: sensitivity_analysis.csv
 """
 
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from sklearn.model_selection import LeaveOneOut
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
+from baseline_counterfactual import compute_recovery_months
+from default_models import loocv_default_xgb, loo_zero_baseline
 
 
-def _build_arrivals_index(arrivals: pd.DataFrame) -> dict:
-    """Pre-index arrivals by (year, month) for O(1) lookup."""
-    idx = {}
-    for _, row in arrivals.iterrows():
-        idx[(int(row["year"]), int(row["month"]))] = float(row["tourist_arrivals"])
-    return idx
-
-
-def _seasonal_baselines(
-    event_year: int,
-    event_month: int,
-    arrivals_idx: dict,
-    min_year: int,
-    baseline_window: int,
-    crisis_years: set,
-    max_months: int = 12,
-) -> dict:
-    """
-    Compute per-offset seasonal baseline matching baseline_counterfactual.py exactly.
-    Returns {offset (1..max_months): baseline_arrivals}.
-    """
-    baselines = {}
-    for offset in range(1, max_months + 1):
-        month_seq = event_month + offset - 1
-        target_month = (month_seq % 12) + 1
-        target_year = event_year + (month_seq // 12)
-
-        valid_vals = []
-        y = target_year - 1
-        while len(valid_vals) < baseline_window:
-            if y < min_year:
-                break
-            if y not in crisis_years:
-                val = arrivals_idx.get((y, target_month))
-                if val is not None and val > 0:
-                    valid_vals.append(val)
-            y -= 1
-
-        if not valid_vals:
-            all_month_vals = [v for (yr, mo), v in arrivals_idx.items() if mo == target_month and v > 0]
-            baselines[offset] = float(np.mean(all_month_vals)) if all_month_vals else 0.0
-        else:
-            baselines[offset] = float(np.mean(valid_vals))
-
-    return baselines
-
-
-def compute_recovery_months_threshold(
-    event_row: pd.Series,
-    arrivals_idx: dict,
-    all_years: list,
-    baseline_window: int,
-    recovery_threshold: float,
-    max_months: int = 12,
-    crisis_years: set = None,
-) -> tuple[int, bool]:
-    """
-    Compute recovery duration for one event under given threshold + baseline window.
-    Uses per-offset seasonal baseline — matches baseline_counterfactual.py exactly.
-    Returns (recovery_months, is_right_censored).
-    """
-    if crisis_years is None:
-        crisis_years = {2019, 2020, 2021, 2022}
-
-    event_year = int(event_row.get("start_year", event_row.get("Start Year", 0)))
-    event_month = int(event_row.get("start_month", event_row.get("Start Month", 1)))
-    min_year = min(all_years) if all_years else 2000
-
-    baselines = _seasonal_baselines(
-        event_year, event_month, arrivals_idx, min_year,
-        baseline_window, crisis_years, max_months,
-    )
-
-    for t in range(1, max_months + 1):
-        month_seq = event_month + t - 1
-        check_month = (month_seq % 12) + 1
-        check_year = event_year + (month_seq // 12)
-        val = arrivals_idx.get((check_year, check_month))
-        baseline = baselines.get(t, 0.0)
-
-        if val is None or baseline <= 0:
-            continue
-
-        if val >= recovery_threshold * baseline:
-            if t == 1:
-                return 0, False
-            return t - 1, False
-
-    return max_months, True
-
-
-def run_sensitivity_loocv(
-    X: np.ndarray,
-    y: np.ndarray,
-    df_events: pd.DataFrame,
-    arrivals_idx: dict,
-    all_years: list,
-    model_class,
-    best_params: dict,
-    threshold: float,
-    baseline_window: int,
-    crisis_years: set,
-    seed: int = 42,
-) -> dict:
-    """
-    Re-run LOOCV after recomputing targets under alternative threshold/window.
-    Returns metrics dict.
-    """
-    new_targets = []
-    for _, row in df_events.iterrows():
-        months, _ = compute_recovery_months_threshold(
-            row, arrivals_idx, all_years, baseline_window, threshold,
-            crisis_years=crisis_years,
+def recompute_targets(df_events, arrivals, window, threshold, persistence, crisis_years, method="seasonal_mean"):
+    months, cens = [], []
+    for _, r in df_events.iterrows():
+        t, _, c, _ = compute_recovery_months(
+            arrivals, int(r["start_year"]), int(r["start_month"]),
+            K=window, threshold=threshold, max_months=12,
+            crisis_years=crisis_years, method=method, persistence=persistence,
         )
-        new_targets.append(months)
-
-    y_sens = np.array(new_targets, dtype=float)
-    valid_mask = ~np.isnan(y_sens)
-    X_v = X[valid_mask]
-    y_v = y_sens[valid_mask]
-
-    if len(X_v) < 5:
-        return {"MAE": np.nan, "RMSE": np.nan, "R2": np.nan, "N": 0}
-
-    loo = LeaveOneOut()
-    preds, trues = [], []
-    for train_idx, test_idx in loo.split(X_v):
-        model = model_class(**best_params, random_state=seed)
-        model.fit(X_v[train_idx], y_v[train_idx])
-        p = float(model.predict(X_v[test_idx])[0])
-        preds.append(np.clip(p, 0, 12))
-        trues.append(y_v[test_idx[0]])
-
-    y_true = np.array(trues)
-    y_pred = np.array(preds)
-    mae = float(mean_absolute_error(y_true, y_pred))
-    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
-    r2 = float(r2_score(y_true, y_pred))
-    return {"MAE": round(mae, 4), "RMSE": round(rmse, 4), "R2": round(r2, 4), "N": int(len(y_v))}
+        months.append(float(t)); cens.append(bool(c))
+    return np.array(months), np.array(cens)
 
 
 def run_full_sensitivity(
-    X_A: np.ndarray,
-    y_A: np.ndarray,
     df_A: pd.DataFrame,
     arrivals: pd.DataFrame,
-    best_model_class,
-    best_params: dict,
+    cfg: dict,
+    crisis_years: set,
     thresholds: list,
     baseline_windows: list,
-    crisis_years: set,
+    persistence_values: list,
     results_dir: Path,
     seed: int = 42,
-    persistence_values: list | None = None,
 ) -> pd.DataFrame:
-    """
-    S-11: Grid over thresholds × baseline_windows × persistence. Export CSV.
-    Adds zero_share and n_censored columns.
-    """
-    if persistence_values is None:
-        persistence_values = [1]
-
-    arrivals_idx = _build_arrivals_index(arrivals)
-    all_years = sorted(arrivals["year"].unique().tolist())
-
     rows = []
+    main_t, main_w, main_p = cfg["experiment"]["recovery_threshold"], cfg["experiment"]["baseline_window_years"], cfg["recovery"]["persistence_months"]
     for thresh in thresholds:
         for window in baseline_windows:
             for persistence in persistence_values:
-                metrics = run_sensitivity_loocv(
-                    X_A, y_A, df_A, arrivals_idx, all_years,
-                    best_model_class, best_params,
-                    thresh, window, crisis_years, seed,
-                )
-                # Recompute targets to get zero_share and n_censored
-                new_targets = []
-                for _, row_ev in df_A.iterrows():
-                    months, is_cens = compute_recovery_months_threshold(
-                        row_ev, arrivals_idx, all_years, window, thresh,
-                        crisis_years=crisis_years,
-                    )
-                    new_targets.append((months, is_cens))
-                y_new = np.array([t[0] for t in new_targets], dtype=float)
-                is_cens = np.array([t[1] for t in new_targets], dtype=bool)
-                n_valid = int(np.sum(~np.isnan(y_new)))
-                zero_share = round(float(np.mean(y_new[~np.isnan(y_new)] == 0)), 4) if n_valid > 0 else np.nan
-                n_censored = int(np.sum(is_cens))
-
-                row = {
-                    "recovery_threshold": thresh,
-                    "baseline_window_years": window,
+                y, cens = recompute_targets(df_A, arrivals, window, thresh, persistence, crisis_years)
+                xgb = loocv_default_xgb(df_A, cfg, y=y, seed=seed)
+                med = loo_zero_baseline(y)
+                rows.append({
+                    "recovery_threshold": thresh, "baseline_window_years": window,
                     "persistence_months": persistence,
-                    "zero_share": zero_share,
-                    "n_censored": n_censored,
-                    **metrics,
-                    "is_main_setting": (thresh == 0.90 and window == 3 and persistence == 1),
-                }
-                rows.append(row)
-                print(
-                    f"      Sensitivity: threshold={thresh:.0%} window={window}yr "
-                    f"persist={persistence} zero_share={zero_share} n_cens={n_censored} "
-                    f"MAE={metrics['MAE']} N={metrics['N']}"
-                )
-
+                    "zero_share": round(float(np.mean(y == 0)), 4), "n_censored": int(cens.sum()),
+                    "n_changed_vs_main": None,
+                    "MAE": xgb["MAE"], "RMSE": xgb["RMSE"], "R2": xgb["R2"], "N": xgb["N"],
+                    "MAE_median_baseline": med["MAE"],
+                    "is_main_setting": bool(thresh == main_t and window == main_w and persistence == main_p),
+                })
+                print(f"      Sensitivity: thr={thresh} K={window} persist={persistence} "
+                      f"zero={rows[-1]['zero_share']} cens={rows[-1]['n_censored']} MAE={xgb['MAE']}")
     df = pd.DataFrame(rows)
-    results_dir = Path(results_dir)
-    results_dir.mkdir(parents=True, exist_ok=True)
+    main = df[df.is_main_setting]
+    if len(main):
+        y_main = df_A["recovery_months"].values.astype(float)
+        y_chk, _ = recompute_targets(df_A, arrivals, main_w, main_t, main_p, crisis_years)
+        assert np.array_equal(y_chk, y_main), "Sensitivity main cell targets differ from the main pipeline targets"
+        ref = df_A["recovery_months"].values.astype(float)
+        for i in df.index:
+            r = df.loc[i]
+            y_i, _ = recompute_targets(df_A, arrivals, int(r.baseline_window_years), r.recovery_threshold,
+                                       int(r.persistence_months), crisis_years)
+            df.loc[i, "n_changed_vs_main"] = int(np.sum(y_i != ref))
+    results_dir = Path(results_dir); results_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(results_dir / "sensitivity_analysis.csv", index=False)
     return df

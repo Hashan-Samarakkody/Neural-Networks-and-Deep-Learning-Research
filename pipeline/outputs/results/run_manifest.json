@@ -1,18 +1,21 @@
 {
-  "commit": "b4ee6f1c8390fc41778a0cd867abd9f652b90f32",
-  "python_version": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
-  "platform": "Windows-11-10.0.26200-SP0",
+  "commit": "0761f592cd29683938ea38e89128f160633312a3",
+  "python_version": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "Linux-6.18.44-fc-v880-x86_64-with-glibc2.39",
   "seed": 42,
-  "config_path": "F:\\Neural Networks and Deep Learning Research\\pipeline\\configs\\model_config.yaml",
-  "run_start_utc": "2026-11-25T16:21:08.479132",
-  "run_end_utc": "2026-11-27T05:51:10.590657",
-  "run_duration_seconds": 135002.111525,
+  "config_path": "/home/claude/work/pipeline/configs/model_config.yaml",
+  "run_start_utc": "2026-11-27T07:21:09.695587",
+  "run_end_utc": "2026-11-27T07:52:43.010434",
+  "run_duration_seconds": 1893.314847,
   "packages": {
     "pandas": "2.2.2",
-    "numpy": "2.2.6",
-    "scikit-learn": "1.9.1",
-    "xgboost": "3.4.1",
-    "shap": "0.52.0",
-    "scipy": "1.14.1"
-  }
+    "numpy": "2.0.2",
+    "scikit-learn": "1.5.2",
+    "xgboost": "2.1.1",
+    "shap": "0.46.0",
+    "scipy": "1.14.1",
+    "scikit-survival": "0.23.1",
+    "matplotlib": "3.9.2"
+  },
+  "pinned_versions_ok": true
 }

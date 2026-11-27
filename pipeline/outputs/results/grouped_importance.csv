@@ -1,5 +1,5 @@
 group,features,sum_mean_mae_increase,n_features
-economy,"Economic_Condition_Index, gdp_growth, global_tourism_idx",0.3478,3
-seasonality,"Season_sin, Season_cos",0.0952,2
-hazard,"DSI, TWDI",0.0224,2
+economy,"Economic_Condition_Index, gdp_growth, global_tourism_idx",0.1856,3
+seasonality,"Season_sin, Season_cos",0.1323,2
+hazard,"DSI, TWDI",0.0377,2
 shock,external_shock_flag,0.0,1

@@ -1,0 +1,9 @@
+method,model_a,model_b,p_raw,p_holm,n_nonzero_diff,significant_at_0.05
+sign_flip_permutation,XGBoost,RandomForest,0.115388,0.57694,41,False
+sign_flip_permutation,XGBoost,Ridge,0.0004,0.0024,46,True
+sign_flip_permutation,XGBoost,SVR,0.483352,1.0,38,False
+sign_flip_permutation,XGBoost,TwoStage,0.434657,1.0,31,False
+sign_flip_permutation,XGBoost,NaiveMean,0.0001,0.0008,46,True
+sign_flip_permutation,XGBoost,NaiveMedian,0.569243,1.0,31,False
+sign_flip_permutation,XGBoost,NaiveLastKnown,0.0001,0.0008,33,True
+sign_flip_permutation,XGBoost,NaivePrevious_Oracle,0.394061,1.0,31,False

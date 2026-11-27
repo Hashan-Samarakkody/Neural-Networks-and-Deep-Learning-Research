@@ -390,3 +390,30 @@ def naive_baselines_split(
             "y_pred": lk_preds,
         },
     }
+
+
+def naive_baselines_multisplit(df: pd.DataFrame, splits: list) -> dict:
+    """
+    Naive baselines for buffered LOOCV / LOYO / expanding-window splits.
+
+    Order of predictions follows the order of splits and test indices (same as run_multisplit).
+    NaiveMean / NaiveMedian: training mean / median.
+    NaiveLastKnown (ex-ante): T_rec of the most recent training event whose 12-month window
+    had closed before the test onset; if none exists, the median of training events that
+    began before the test onset; if none, the training median.
+    """
+    onset = (df["start_year"].astype(int) * 12 + df["start_month"].astype(int)).values
+    y = df["recovery_months"].values.astype(float)
+    res = {k: {"y_true": [], "y_pred": []} for k in ("NaiveMean", "NaiveMedian", "NaiveLastKnown")}
+    for train_idx, test_idx in splits:
+        train_idx = np.asarray(train_idx); ytr = y[train_idx]
+        for t in np.asarray(test_idx):
+            closed = [j for j in train_idx if onset[j] + 12 <= onset[t]]
+            if closed:
+                last = max(closed, key=lambda j: onset[j]); lk = y[last]
+            else:
+                earlier = [y[j] for j in train_idx if onset[j] < onset[t]]
+                lk = float(np.median(earlier)) if earlier else float(np.median(ytr))
+            for k, v in (("NaiveMean", float(np.mean(ytr))), ("NaiveMedian", float(np.median(ytr))), ("NaiveLastKnown", float(lk))):
+                res[k]["y_true"].append(float(y[t])); res[k]["y_pred"].append(v)
+    return res

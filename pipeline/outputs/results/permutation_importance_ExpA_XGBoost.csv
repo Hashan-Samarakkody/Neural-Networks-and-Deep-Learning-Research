@@ -1,0 +1,9 @@
+Feature,mean_mae_increase,std_mae_increase,Rank
+Economic_Condition_Index,0.8845,1.6127,1
+Season_sin,0.2577,0.8229,2
+Season_cos,0.2117,0.5705,3
+DSI,0.085,0.3114,4
+TWDI,0.0087,0.0453,5
+gdp_growth,0.0084,0.0424,6
+external_shock_flag,0.0,0.0,7
+global_tourism_idx,-0.0653,0.6488,8

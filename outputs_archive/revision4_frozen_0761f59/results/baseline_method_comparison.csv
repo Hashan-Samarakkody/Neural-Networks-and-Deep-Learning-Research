@@ -1,0 +1,4 @@
+method,n_events,median_recovery,mean_recovery,n_right_censored,n_zero
+seasonal_mean,60,0.0,2.9,10,38
+seasonal_trend,60,0.0,2.95,10,35
+yoy_growth,60,0.0,3.633,15,35

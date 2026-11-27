@@ -250,3 +250,19 @@ Outputs: `permutation_importance_{exp}_{model}.csv`, `grouped_importance.csv`, `
 |-|-----|-----|
 | 2004 tsunami type | `Flood` (first record's type) | `mixed` (`composite_type` column) |
 | member_types | Not stored | `member_types` column (e.g. `"Flood; Earthquake"`) |
+
+
+## Revision 5 (paper-results-v4)
+
+| ID | Change | Result |
+|----|--------|--------|
+| S-04 | Survival models rewritten (Cox, random survival forest, discrete-time hazard); time = T_rec + 1; IBS with administrative censoring; failures reported, all-fail aborts | Experiment B C-index 0.69 / 0.57 / 0.89; IBS 0.32 / 0.37 / 0.11 |
+| S-05 | Strict version check, pins updated (scikit-learn 1.5.2, scikit-survival 0.23.1), run in the pinned environment | `pinned_versions_ok: true`; docs/VERSION_SENSITIVITY.md rewritten with measured numbers |
+| S-06 | Buffered LOOCV, LOYO and expanding window now include mean, median and ex-ante last-known baselines | median baseline 1.109 vs best model 1.143 (buffered), 1.138 (LOYO) |
+| S-07/S-11 | Sensitivity grid recomputes targets with the main-pipeline function (persistence applied, no all-years fallback), fold-safe features, median baseline per cell, `n_changed_vs_main` | persistence 2 changes up to 17 targets; MAE 0.04–2.08 |
+| S-01 | Confounding variants: all, without civil-war window, without civil-war window and 2023 tail, flagged groups; with median baseline | 33 events, 97% zero: XGBoost 0.091 = median 0.091 |
+| S-02 | Baseline-method comparison reports default-XGBoost and median MAE per method | trend baseline XGBoost 1.50 vs median 1.11 |
+| S-10 | `paper_extras.json`, `make_paper_figures.py` (Figure 1 from outputs), `make_readme.py` | no paper statistic is computed outside the repository |
+| S-18 | Experiment A permutation importance; ablation now removes the global index, hazard features, the economy group, seasonality | removing the index lowers MAE (0.678 vs 0.755) |
+| consistency | One default-XGBoost helper for all analyses with a runtime assertion | MAE 0.755 in grid main cell, confounding, ablation, lag, baseline comparison |
+| checkpoint | Expensive stages are cached in `outputs/cache` (git-ignored) so an interrupted run resumes | |

@@ -1,4 +1,4 @@
-method,n_events,median_recovery,mean_recovery,n_right_censored,n_zero
-seasonal_mean,60,0.0,2.9,10,38
-seasonal_trend,60,0.0,2.95,10,35
-yoy_growth,60,0.0,3.633,15,35
+method,n_events,median_recovery,mean_recovery,n_right_censored,n_zero,ExpA_N,ExpA_zero_share,ExpA_n_censored,ExpA_XGBoost_default_MAE,ExpA_XGBoost_default_R2,ExpA_median_baseline_MAE
+seasonal_mean,60,0.0,2.9,10,38,46,0.7826,0,0.7546,0.5921,1.1087
+seasonal_trend,60,0.0,2.95,10,35,46,0.7391,0,1.5045,-0.6962,1.1087
+yoy_growth,60,0.0,3.633,15,35,46,0.7174,5,1.2264,0.5168,2.0652

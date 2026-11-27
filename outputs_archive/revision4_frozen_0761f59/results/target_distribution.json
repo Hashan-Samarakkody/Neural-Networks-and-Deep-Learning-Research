@@ -1,0 +1,11 @@
+{
+  "n_total": 60,
+  "n_zero_months": 38,
+  "n_right_censored_12": 10,
+  "mean": 2.9,
+  "median": 0.0,
+  "std": 4.618,
+  "min": 0.0,
+  "max": 12.0,
+  "censoring_rate_pct": 16.7
+}

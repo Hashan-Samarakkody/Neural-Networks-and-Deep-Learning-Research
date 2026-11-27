@@ -1,0 +1,9 @@
+Feature,Display_Name,Mean_Abs_SHAP,Rank
+global_tourism_idx,Global Tourism Index,0.5332232,1
+gdp_growth,GDP Growth Rate,0.36534956,2
+Season_sin,Seasonality (Sine),0.31072474,3
+Economic_Condition_Index,Economic Condition Index,0.29496935,4
+Season_cos,Seasonality (Cosine),0.27761373,5
+TWDI,Tourism-Weighted Disaster Impact,0.24738461,6
+DSI,Disaster Severity Index,0.14680903,7
+external_shock_flag,External Shock Flag,0.0,8

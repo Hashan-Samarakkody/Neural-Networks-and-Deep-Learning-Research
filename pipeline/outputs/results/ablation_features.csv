@@ -1,0 +1,6 @@
+variant,features_removed,n_features,MAE,RMSE,R2,N
+full,none,8,0.7546,1.5827,0.5921,46
+no_global_tourism_idx,global_tourism_idx,7,0.6784,1.5256,0.6209,46
+no_hazard_severity,"DSI,TWDI",6,0.7905,1.7318,0.5116,46
+no_economy,"global_tourism_idx,gdp_growth,Economic_Condition_Index",5,1.4947,2.7392,-0.222,46
+no_seasonality,"Season_sin,Season_cos",6,1.1122,2.0663,0.3047,46

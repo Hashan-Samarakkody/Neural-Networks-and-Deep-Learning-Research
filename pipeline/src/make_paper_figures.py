@@ -1,15 +1,10 @@
 """
-S-10: Generate all paper figures from pipeline outputs.
+Figure 1 of the paper, generated from outputs only.
 
-Figure 1: Recovery duration distribution histogram (SVG/PDF + 300dpi PNG).
-Figure 2: Model comparison bar chart (Exp A LOOCV).
-Figure 3: Sensitivity heatmap (threshold x baseline window).
-
-Usage:
-    cd pipeline
-    python src/make_paper_figures.py
+(a) distribution of T_rec by regime, (b) Kaplan-Meier curves, (c) permutation importance of
+the Experiment A default-setting XGBoost LOOCV model (a model that generalises).
+Writes figure1.svg (text as outlines), figure1.pdf and figure1.png (300 dpi).
 """
-
 import json
 import numpy as np
 import pandas as pd
@@ -19,113 +14,43 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-RESULTS_DIR = ROOT / "outputs" / "results"
-FIGURES_DIR = ROOT / "outputs" / "figures"
+NAMES = {"global_tourism_idx": "Global tourism index", "Economic_Condition_Index": "ECI", "gdp_growth": "GDP growth",
+         "DSI": "DSI", "Season_cos": "Season (cos)", "Season_sin": "Season (sin)", "TWDI": "TWDI",
+         "external_shock_flag": "Shock flag"}
 
 
-def figure1_recovery_distribution(results_dir: Path, figures_dir: Path) -> None:
-    """Figure 1: Recovery duration distribution with right-censoring annotation."""
-    td_path = results_dir / "target_distribution.json"
-    if not td_path.exists():
-        print("[WARN] target_distribution.json not found; skipping Figure 1")
-        return
-
-    dist = json.loads(td_path.read_text())
-    er_path = results_dir / "experiment_results.csv"
-    if not er_path.exists():
-        return
-
-    er = pd.read_csv(er_path)
-    exp_a = er[er["Experiment"] == "ExpA_LOOCV"]
-    if exp_a.empty:
-        return
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("Sri Lanka Tourism Recovery After Natural Disasters (2000–2025)", fontsize=13)
-
-    # Panel A: distribution histogram
-    ax = axes[0]
-    # We don't have raw y here; use dist summary to annotate
-    ax.set_xlabel("Recovery Duration (months)", fontsize=11)
-    ax.set_ylabel("Number of Events", fontsize=11)
-    ax.set_title(
-        f"(a) Recovery Duration Distribution\n"
-        f"N={dist['n_total']}, Median={dist['median']:.0f} mo, "
-        f"Right-censored={dist['n_right_censored_12']} ({dist['censoring_rate_pct']}%)",
-        fontsize=10,
-    )
-    ax.text(0.5, 0.5, "Run pipeline to populate\nhistogram data",
-            ha="center", va="center", transform=ax.transAxes, fontsize=9, color="gray")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    # Panel B: model comparison (Exp A LOOCV)
-    ax2 = axes[1]
-    ml_models = ["TwoStage", "XGBoost", "RandomForest", "SVR", "Ridge"]
-    sub = exp_a[exp_a["Model"].isin(ml_models)].sort_values("MAE")
-    bars = ax2.barh(sub["Model"], sub["MAE"], color="#2c7bb6", edgecolor="white")
-    ax2.set_xlabel("MAE (months)", fontsize=11)
-    ax2.set_title("(b) Model Performance — Exp A LOOCV", fontsize=10)
-    for bar, mae in zip(bars, sub["MAE"]):
-        ax2.text(bar.get_width() + 0.02, bar.get_y() + bar.get_height() / 2,
-                 f"{mae:.2f}", va="center", fontsize=8)
-    ax2.spines["top"].set_visible(False)
-    ax2.spines["right"].set_visible(False)
-    ax2.invert_yaxis()
-
-    plt.tight_layout()
+def make_figure1(results_dir: Path, figures_dir: Path) -> None:
+    results_dir, figures_dir = Path(results_dir), Path(figures_dir)
     figures_dir.mkdir(parents=True, exist_ok=True)
-    fig.savefig(figures_dir / "figure1_recovery_overview.svg", format="svg", bbox_inches="tight")
-    fig.savefig(figures_dir / "figure1_recovery_overview.pdf", format="pdf", bbox_inches="tight")
-    fig.savefig(figures_dir / "figure1_recovery_overview.png", format="png", dpi=300, bbox_inches="tight")
+    plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Liberation Serif", "DejaVu Serif"],
+                         "font.size": 8, "svg.fonttype": "path"})
+    ev = pd.read_csv(results_dir / "supplementary_event_table.csv")
+    ex = json.loads((results_dir / "paper_extras.json").read_text())
+    perm = pd.read_csv(results_dir / "permutation_importance_ExpA_XGBoost.csv")
+    crisis = ev.external_shock_flag == 1
+    iso, cr = ev[~crisis], ev[crisis]
+    fig, ax = plt.subplots(1, 3, figsize=(6.5, 1.55), gridspec_kw={"width_ratios": [1, 1, 1.05]})
+    b = np.arange(13)
+    ax[0].bar(b - 0.2, [(iso.recovery_months == k).sum() for k in b], 0.4, color="#2b7bba", label=f"Outside 2019–2022 (n = {len(iso)})")
+    ax[0].bar(b + 0.2, [(cr.recovery_months == k).sum() for k in b], 0.4, color="#d62728", label=f"2019–2022 (n = {len(cr)})")
+    ax[0].set_xlabel("$T_{rec}$ (months)"); ax[0].set_ylabel("Events"); ax[0].set_xticks([0, 2, 4, 6, 8, 10, 12])
+    ax[0].legend(frameon=False, fontsize=6, loc="upper right", bbox_to_anchor=(1.12, 1.02)); ax[0].set_title("(a)", loc="left", fontsize=8)
+    for key, col, lab in (("outside_crisis", "#2b7bba", "Outside 2019–2022"), ("crisis_window", "#d62728", "2019–2022")):
+        x, y = ex["km_curves"][key]
+        ax[1].step(x, y, where="post", color=col, label=lab)
+    ax[1].set_xlabel("Months since onset"); ax[1].set_ylabel("Proportion not recovered"); ax[1].set_ylim(0, 1.02)
+    ax[1].set_xticks([0, 2, 4, 6, 8, 10, 12]); ax[1].legend(frameon=False, fontsize=6.5, loc="center right"); ax[1].set_title("(b)", loc="left", fontsize=8)
+    s = perm.sort_values("mean_mae_increase")
+    ax[2].barh([NAMES.get(f, f) for f in s.Feature], s.mean_mae_increase, color="#555555")
+    ax[2].axvline(0, color="black", lw=0.5)
+    ax[2].set_xlabel("MAE increase (months)"); ax[2].set_title("(c)", loc="left", fontsize=8); ax[2].tick_params(axis="y", labelsize=7)
+    for a in ax:
+        a.spines[["top", "right"]].set_visible(False)
+    plt.tight_layout(w_pad=0.8)
+    for ext, kw in (("svg", {}), ("pdf", {}), ("png", {"dpi": 300})):
+        fig.savefig(figures_dir / f"figure1.{ext}", **kw)
     plt.close(fig)
-    print("  Figure 1 written: figure1_recovery_overview.{svg,pdf,png}")
-
-
-def figure2_sensitivity_heatmap(results_dir: Path, figures_dir: Path) -> None:
-    """Figure 2: Sensitivity heatmap."""
-    sa_path = results_dir / "sensitivity_analysis.csv"
-    if not sa_path.exists():
-        print("[WARN] sensitivity_analysis.csv not found; skipping Figure 2")
-        return
-
-    sa = pd.read_csv(sa_path)
-    pivot = sa.pivot(
-        index="recovery_threshold",
-        columns="baseline_window_years",
-        values="MAE",
-    )
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-    im = ax.imshow(pivot.values, cmap="YlOrRd", aspect="auto")
-    ax.set_xticks(range(len(pivot.columns)))
-    ax.set_yticks(range(len(pivot.index)))
-    ax.set_xticklabels([f"{w}yr" for w in pivot.columns], fontsize=10)
-    ax.set_yticklabels([f"{t:.0%}" for t in pivot.index], fontsize=10)
-    ax.set_xlabel("Baseline Window (years)", fontsize=11)
-    ax.set_ylabel("Recovery Threshold", fontsize=11)
-    ax.set_title("Sensitivity: MAE across threshold × baseline window", fontsize=11)
-    for i in range(len(pivot.index)):
-        for j in range(len(pivot.columns)):
-            val = pivot.values[i, j]
-            if not np.isnan(val):
-                ax.text(j, i, f"{val:.2f}", ha="center", va="center",
-                        fontsize=9, color="black" if val < pivot.values.max() * 0.7 else "white")
-    plt.colorbar(im, ax=ax, label="MAE (months)")
-    plt.tight_layout()
-    fig.savefig(figures_dir / "figure2_sensitivity_heatmap.svg", format="svg", bbox_inches="tight")
-    fig.savefig(figures_dir / "figure2_sensitivity_heatmap.pdf", format="pdf", bbox_inches="tight")
-    fig.savefig(figures_dir / "figure2_sensitivity_heatmap.png", format="png", dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    print("  Figure 2 written: figure2_sensitivity_heatmap.{svg,pdf,png}")
-
-
-def main():
-    print("Generating paper figures...")
-    figure1_recovery_distribution(RESULTS_DIR, FIGURES_DIR)
-    figure2_sensitivity_heatmap(RESULTS_DIR, FIGURES_DIR)
-    print("Done.")
 
 
 if __name__ == "__main__":
-    main()
+    make_figure1(ROOT / "outputs" / "results", ROOT / "outputs" / "figures")

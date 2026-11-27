@@ -17,15 +17,15 @@
       "top_3_features": [
         {
           "Feature": "global_tourism_idx",
-          "Mean_Abs_SHAP": 0.5332232117652893
-        },
-        {
-          "Feature": "gdp_growth",
-          "Mean_Abs_SHAP": 0.36534956097602844
+          "Mean_Abs_SHAP": 0.5807482004165649
         },
         {
           "Feature": "Season_sin",
-          "Mean_Abs_SHAP": 0.31072473526000977
+          "Mean_Abs_SHAP": 0.36555051803588867
+        },
+        {
+          "Feature": "gdp_growth",
+          "Mean_Abs_SHAP": 0.3125990331172943
         }
       ],
       "note": "DSI and TWDI capture hazard severity; external_shock_flag captures systematic macro-collapses (COVID, Easter attacks, 2022 crisis) outside physical disaster mechanism."
@@ -34,8 +34,8 @@
   "RQ3": {
     "question": "Can ML models predict recovery duration better than naive historical baselines?",
     "answer": {
-      "experiment_A_best_model": "XGBoost",
-      "experiment_A_best_MAE": 0.9327,
+      "experiment_A_best_model": "RandomForest",
+      "experiment_A_best_MAE": 1.0596,
       "experiment_B_best_model": "Ridge",
       "experiment_B_best_MAE": 4.8835,
       "wilcoxon_vs_naive": {

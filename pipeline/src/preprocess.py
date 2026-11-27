@@ -21,7 +21,7 @@ from feature_engineering import (
     add_macro_features, add_external_shock_flag,
 )
 
-# damage_usd_000 is missing for 74 % of records; use 3-component DSI.
+# damage_usd_000 is missing for 62 of 80 physical records (77.5 %); use 3-component DSI.
 # Set dsi_include_damage: true in config to revert to 4-component (sensitivity).
 _DSI3 = ["total_affected", "deaths", "duration_days"]
 _DSI4 = ["total_affected", "deaths", "damage_usd_000", "duration_days"]

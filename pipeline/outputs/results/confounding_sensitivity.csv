@@ -1,4 +1,6 @@
-variant,n_events,MAE,RMSE,R2,note
-all,46,1.2399,2.3367,0.1108,
-excluded,37,0.4574,1.1355,0.5092,
-flagged_only,9,4.5829,5.2982,-1.0337,
+variant,n_events,zero_share,MAE,RMSE,R2,MAE_median_baseline,note
+all,46,0.7826,0.7546,1.5827,0.5921,1.1087,
+excluded_civil_war,37,0.8649,0.4574,1.1355,0.5092,0.5405,
+excluded_civil_war_and_tail,33,0.9697,0.091,0.5222,-0.0313,0.0909,
+flagged_civil_war,9,0.4444,3.5494,4.6393,-0.5594,4.8889,
+flagged_tail,4,,,,,,too few events

@@ -76,6 +76,23 @@ def extract_paper_numbers(results_dir: Path) -> dict:
     if cf_path.exists():
         numbers["confounding_variants"] = pd.read_csv(cf_path).to_dict(orient="records")
 
+    # Statistics derived from data and saved predictions (paper_extras.py)
+    for key, fname, kind in (
+        ("paper_extras", "paper_extras.json", "json"),
+        ("stage1", "two_stage_stage1.json", "json"),
+        ("run_manifest", "run_manifest.json", "json"),
+        ("ablation", "ablation_features.csv", "csv"),
+        ("macro_lag", "macro_lag_sensitivity.csv", "csv"),
+        ("permutation_importance_ExpA", "permutation_importance_ExpA_XGBoost.csv", "csv"),
+        ("permutation_importance_ExpB", "permutation_importance_ExpB_XGBoost.csv", "csv"),
+        ("grouped_importance", "grouped_importance.csv", "csv"),
+        ("vif", "vif.csv", "csv"),
+        ("shap_ExpB_XGBoost", "shap_importance_ExpB_XGBoost.csv", "csv"),
+    ):
+        pth = results_dir / fname
+        if pth.exists():
+            numbers[key] = json.loads(pth.read_text()) if kind == "json" else pd.read_csv(pth).to_dict(orient="records")
+
     out_path = results_dir / "paper_numbers.json"
     out_path.write_text(json.dumps(numbers, indent=2, default=str))
     return numbers

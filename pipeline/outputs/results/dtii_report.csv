@@ -1,61 +1,61 @@
-disaster_id,start_year,start_month,disaster_type,location
-2002-0788-LKA,2002,12,Flood,"Polonnaruwa, Anuradhapra districts (North Central province), Kilinochchi district (Northern province), Puttalam district (North Western province), Eastern province"
-2003-0229-LKA,2003,5,Flood,"Ratnapura district (Sabaragamuwa province), Kalutara district (Western province), Nuwara Eliya district (Central province), Southern province"
-2004-0652-LKA,2004,12,mixed,"Kilinochchi, Jaffna, Vavuniya, Mullattivu districts (North province), Matara district (Southern province), North Central, Eastern provinces; Jaffna, Kilinochchi, Mullativu, Trincomalee, Batticaloa, Ampara, Hambantota, Matara, Galle, Kalutara, Colombo, Gampaha, Puttalam, Vavuniya districts"
-2005-0646-LKA,2005,11,Flood,"Colombo, Gampaha districts (Western province), Trincomalee district (Eastern province), Jaffna, Kilinochchi, Mullattivu districts (Northern province)"
-2006-0602-LKA,2006,10,Flood,"Galle, Matara districts (Southern province), Badulla district (Uva province), Western, North Western, Sabaragamuwa provinces"
-2007-0012-LKA,2007,1,Flood,"Walapane village (Nuwara Eliya district, Central province)"
-2007-0187-LKA,2007,5,Flood,"Galle district (Southern province), Western province"
-2007-0609-LKA,2007,12,Flood,"Batticaloa, Ampara districts (Eastern province)"
-2008-0132-LKA,2008,3,Flood,"Mannar district (Northern province), Ratnapura district (Sabaragamuwa province), Gampaha district (Western province), Puttalam district (North Western province), Uva, Eastern provinces"
-2008-0184-LKA,2008,4,Storm,"Colombo, Kalutara, Gampaha districts (Western province), Ratnapura, Kegalle districts (Sabaragamuwa province), Puttalam district (North Western province), Nuwara Eliya district (Central province), Galle district (Southern province)"
-2008-0224-LKA,2008,5,Flood,"Galle, Matara districts (Southern province), Puttalam district (North Western province), Nuwara Eliya district (Central province), Sabaragamuwa, Western provinces"
-2008-0560-LKA,2008,11,Flood,"Chankanai, Chavakachcheri, Delft, Jaffna, Karaveddy, Kayts, Kopay, Maruthnkerny, Nallu, Point Pedro, Sandilipay, Tellipallai, Uduvil, Velanai, Karainagar areas (Jaffna district, Northern province), Manthai East, Thumukkai, Puthukkudiyirupp, Maritemepattu, Oddusuddan areas (Mullattivu district, Northern province), Madhu, Mannar, Manthai West, Musalai, Nanaddan areas (Mannar district, Northern province), Chilampattai, Gomarankadawela, Kantalai, Kinniya, Kuchaveli, Morawewa, Muttur, Padavi Sri Pura, Seruvila, Thampalakamam, Gravets areas (Trincomalee district, Eastern province)"
-2009-0336-LKA,2009,8,Flood,"Vavuniya district (Northern province), Ratnapura district (Sabaragamuwa province), Kalutara district (Western province)"
-2009-0501-LKA,2009,11,Flood,"Colombo district (Western province); Batticaloa, Ampara districts (Eastern province)"
-2010-0191-LKA,2010,5,Flood,"Galle, Matara districts (Southern province), Ratnapura district (Sabaragamuwa province), Anuradhapura district (North Central province), Nuwara Eliya district (Central province), Mannar, Jaffna districts (Northern province), Trincomalee district (Eastern province), Western, North Western provinces"
-2010-0583-LKA,2010,11,Flood,"Matara district (Southern province), Kegalle district (Sabaragamuwa province), Western province"
-2011-0024-LKA,2011,1,Flood,"Vavuniya district (Northern province), Central, Eastern, North Central, Sabaragamuwa, Uva provinces; Central, Northern, North Central, Eastern, Uva provinces"
-2011-0590-LKA,2011,5,Flood,"Kegalle district (Sabaragamuwa province), Galle district (Southern province), Gampaha, Colombo, Kalutara districts (Western province)"
-2011-0484-LKA,2011,11,Storm,"Sabaragamuwa, Southern, Uva provinces"
-2012-9405-LKA,2012,1,Drought,"Anuradhapura, Polonnaruwa districts (North Central province), Kurunegala, Puttalam districts (North Western province), Moneragala district (Uva province), Hambantota district (Southern province), Mannar district (Northern province)"
-2012-0425-LKA,2012,10,Storm,"Central, Eastern, North Central, North Western, Northern, Sabaragamuwa, Southern, Uva, Western provinces"
-2012-0537-LKA,2012,12,Flood,"Matale, Kandy, Nuwara Eliya districts (Central province), Batticaloa district (Eastern province), Polonnaruwa, Kurunegala districts (North Central province), Galle, Hambantota districts (Southern province), Badulla, Moneragala districts (Uva province); Central, Eastern, Northern provinces"
-2013-0138-LKA,2013,5,mixed,"Central, Eastern, North Central, North Western, Northern, Sabaragamuwa, Southern, Uva, Western provinces; Western, Central, Southern, Sabaragamuwa, North Western provinces"
-2014-9393-LKA,2014,1,Drought,"Mullattivu, Kilinochchi, Mannar, Vavuniya, Jaffna districts (Northern province), Moneragala district (Uva province), Ampara, Batticaloa, Trincomalee districts (Eastern province), Anuradhapura, Polonnaruwa districts (North Central province), Kurunegala, Puttalam districts (North Western province), Hambantota, Galle districts (Southern province)"
-2014-0535-LKA,2014,2,Flood,"Central, Eastern, North Central, North Western, Northern, Sabaragamuwa, Southern, Uva, Western provinces"
-2014-0181-LKA,2014,6,Flood,Western province
-2014-0402-LKA,2014,10,Mass movement (wet),"Southern province; Haldummulla area (Badulla district, Uva province); Koslanda area (Badulla district, Uva province)"
-2014-0495-LKA,2014,12,Flood,Mullattivu district (Northern province)
-2015-0547-LKA,2015,9,Flood,Southern province
-2015-0530-LKA,2015,11,Flood,"Trincomalee, Ampara districts (Eastern province), Jaffna, Mullattivu, Kilinochchi districts (Northern province), Puttalam district (North Western province), Gampaha district (Western province), Moneragala district (Uva province)"
-2016-0153-LKA,2016,5,Flood,"Kilinochchi district (Northern province), Colombo district (Western province), Kegalle district (Sabaragamuwa province)"
-2016-9529-LKA,2016,10,Drought,Batticaloa District (Eastern province)
-2017-0153-LKA,2017,5,Flood,"Ratnapura, Matara, Kalutara, Galle, Gampaha, Colombo, Sabaragamuwa, Hambantota"
-2017-0493-LKA,2017,11,mixed,"Telippalai, Pointpedro, Kopay, Maruthankrny, Chenkannai (Jaffna district, Northern province); Galle, Matara (Southern), Colombo, Badulla (Uva), Gampaha, Kalutara (Western), Nuwara Eliya (Central)"
-2018-0278-LKA,2018,5,Flood,"Puttalam,Gampaha, Ratnapura, Colombo, Kurunegala, Kalutara,Kegalle districts"
-2018-0384-LKA,2018,10,Flood,"Kalutara, Galle, Rathnapura, Kegalle districts"
-2018-0467-LKA,2018,12,Flood,"Mullaithvu,Kilinochchi, Mannar, Vavuniya, Jaffna districts"
-2019-9389-LKA,2019,8,Drought,"North, North-Western, North-Central, Uva and Eastern Provinces"
-2019-0452-LKA,2019,9,Flood,"Galle, Kalutara, Gampaha, Ratnapura, Kegalle, Matara, Colombo"
-2019-0499-LKA,2019,10,Flood,southern and western
-2019-0577-LKA,2019,11,Flood,"Walapane Village (Nuwara Eliya District, Central Province); Batticaloa District (Eastern Province) ; Uva province; North-west, and East provinces; Mullative, Kilinochchi, Jaffna, Vavuniya (Nothern), Anuradhapura (Noth-Central), Batticaloa (Eastern), Badulla (Uva) districts; Matale, Kandy, Nuwara Eliya, Badulla, Moneragala, Ratnapura, Anuradhapura, Batticaloa, Polonnaruwa, Puttlam, Trincomalee, Vavuniya, Ampara, Kurunegala, Hambantota, Kegalle"
-2020-0211-LKA,2020,5,Storm,"Ratnapura district, Kegalle, Kottampitiya (Kegalle), Pelmadulla (Ratnapura), Polonnaruwa"
-2020-0461-LKA,2020,9,Flood,"Puttalam, Gampaha districts"
-2020-0548-LKA,2020,12,Flood,"Mannar, Jaffna, Kilinorchchi, Mullaitivu, Vavuniya, Trincomalee, Kegalle, Rathnapura, Badulla, Kandy, Matal, Puttlam, Anuradhapura, Polonnaruwa; Batticaloa"
-2021-0253-LKA,2021,5,mixed,"Colombo, Gampaha, Kaluthara, Rathnapura, Puttlam, Kegalle, Nuwara Eliya, Galle, Matara, Kurunegala, Kandy; Western, Central and Southern Provinces"
-2021-0714-LKA,2021,10,Flood,"Rathnapura, Nuwara Eliya,Kandy, Jaffna, Badulla, Puttalam Districts; Rambukkana Town (Kurunegala District); Matale District"
-2022-0336-LKA,2022,5,Storm,"Sabaragamuwa, Central provinces; Gampaha and Colombo (Western Province)"
-2022-0490-LKA,2022,8,Flood,"Nuwara Eliya District (southern Central Province); Kandy District (central-western Central Province); Jaffna, Kandy, Matale, Gampaha, Galle, Matara, Hambantota, Kegalle, Rathnapura"
-2022-0785-LKA,2022,9,Flood,"Awissawella area of the Colombo district; Kegalle, Kurunegala, Rathnapura, Kandy, Gampaha, Matale, Kalutara, Puttlam, Nuwara Eliya"
-2022-0677-LKA,2022,10,Flood,"Trincomalee (Eastern Province); Kalutara, Gampaha, Colombo district (Western Province); Hambantota and Galle (Southern Province); Killinochchi (Northern Province); Puttalam (North Western Province); Kandy (Central Province); Kegalle and Rathnapura (Sabaragamuwa)"
-2022-0798-LKA,2022,12,Storm,Badulla District (Uva Province)
-2023-0256-LKA,2023,4,Storm,
-2023-0436-LKA,2023,7,Storm,
-2023-0654-LKA,2023,9,Flood,"Western, Southern, Northern, Central, North Western, and Sabaragamuwa Provinces; Kandy and Nuwara-Eliya Districts."
-2023-0733-LKA,2023,11,Storm,"Kurunegala, Kandy, Anuradhapura, Puttalam, Ratnapura Districts; Kurunegala, Kilinochchi Districts"
-2024-0008-LKA,2024,1,Flood,Ampara and Badulla districts
-2024-0298-LKA,2024,5,Flood,"Colombo, Gampaha, Kalutara, Matara, Ratnapura, Kegalle, and Galle districts"
-2024-0733-LKA,2024,10,Storm,"Colombo and Gampaha districts; North Western, Sabaragamuwa, Wester"
-2024-0881-LKA,2024,11,Storm,"Ampara, Batticaloa, Trincomalee districts (Eastern province); Mannar, Jana, Kilinochchi, Mullaitivu, Vavuniy districts (Nothern province); Anuradhapura district ( NorthCentral province)"
-2025-0994-LKA,2025,11,mixed,"Ganetenna, Pahala Kadugannawa (Sabaragamuwa province); Badulla, Nuwara Eliya, districts; Puttalam, Badulla, Monaragala, Matale, Colombo, Batticoloa, Kegalle, Trincomalee, Anuradhapura, Mullaitivu, Kilinochchi, Ampara, Jaffna, Polonnaruwa, Kandy, Rathnapura, Kurunegala, Nuwara Eliya, Matara, Hambantota, Galle, Kalutara, Mannar, Gampaha, Vavuniya districts"
+disaster_id,start_year,start_month,disaster_type,location,dtii_rule,TWDI
+2002-0788-LKA,2002,12,Flood,"Polonnaruwa, Anuradhapra districts (North Central province), Kilinochchi district (Northern province), Puttalam district (North Western province), Eastern province",polonnaruwa,0.008519457763751136
+2003-0229-LKA,2003,5,Flood,"Ratnapura district (Sabaragamuwa province), Kalutara district (Western province), Nuwara Eliya district (Central province), Southern province",kalutara,0.06302851826035263
+2004-0652-LKA,2004,12,mixed,"Kilinochchi, Jaffna, Vavuniya, Mullattivu districts (North province), Matara district (Southern province), North Central, Eastern provinces; Jaffna, Kilinochchi, Mullativu, Trincomalee, Batticaloa, Ampara, Hambantota, Matara, Galle, Kalutara, Colombo, Gampaha, Puttalam, Vavuniya districts",colombo,0.195
+2005-0646-LKA,2005,11,Flood,"Colombo, Gampaha districts (Western province), Trincomalee district (Eastern province), Jaffna, Kilinochchi, Mullattivu districts (Northern province)",colombo,0.08464349068490087
+2006-0602-LKA,2006,10,Flood,"Galle, Matara districts (Southern province), Badulla district (Uva province), Western, North Western, Sabaragamuwa provinces",galle,0.09206287880790948
+2007-0012-LKA,2007,1,Flood,"Walapane village (Nuwara Eliya district, Central province)",nuwara eliya,0.023389187481219546
+2007-0187-LKA,2007,5,Flood,"Galle district (Southern province), Western province",galle,0.06984204581899948
+2007-0609-LKA,2007,12,Flood,"Batticaloa, Ampara districts (Eastern province)",ampara,0.018303638465833015
+2008-0132-LKA,2008,3,Flood,"Mannar district (Northern province), Ratnapura district (Sabaragamuwa province), Gampaha district (Western province), Puttalam district (North Western province), Uva, Eastern provinces",gampaha,0.025332087669938438
+2008-0184-LKA,2008,4,Storm,"Colombo, Kalutara, Gampaha districts (Western province), Ratnapura, Kegalle districts (Sabaragamuwa province), Puttalam district (North Western province), Nuwara Eliya district (Central province), Galle district (Southern province)",colombo,0.0901712184903169
+2008-0224-LKA,2008,5,Flood,"Galle, Matara districts (Southern province), Puttalam district (North Western province), Nuwara Eliya district (Central province), Sabaragamuwa, Western provinces",galle,0.08216570316874568
+2008-0560-LKA,2008,11,Flood,"Chankanai, Chavakachcheri, Delft, Jaffna, Karaveddy, Kayts, Kopay, Maruthnkerny, Nallu, Point Pedro, Sandilipay, Tellipallai, Uduvil, Velanai, Karainagar areas (Jaffna district, Northern province), Manthai East, Thumukkai, Puthukkudiyirupp, Maritemepattu, Oddusuddan areas (Mullattivu district, Northern province), Madhu, Mannar, Manthai West, Musalai, Nanaddan areas (Mannar district, Northern province), Chilampattai, Gomarankadawela, Kantalai, Kinniya, Kuchaveli, Morawewa, Muttur, Padavi Sri Pura, Seruvila, Thampalakamam, Gravets areas (Trincomalee district, Eastern province)",trincomalee,0.021564776939617395
+2009-0336-LKA,2009,8,Flood,"Vavuniya district (Northern province), Ratnapura district (Sabaragamuwa province), Kalutara district (Western province)",kalutara,0.021958424465056837
+2009-0501-LKA,2009,11,Flood,"Colombo district (Western province); Batticaloa, Ampara districts (Eastern province)",colombo,0.11450276462378237
+2010-0191-LKA,2010,5,Flood,"Galle, Matara districts (Southern province), Ratnapura district (Sabaragamuwa province), Anuradhapura district (North Central province), Nuwara Eliya district (Central province), Mannar, Jaffna districts (Northern province), Trincomalee district (Eastern province), Western, North Western provinces",galle,0.08315436246204713
+2010-0583-LKA,2010,11,Flood,"Matara district (Southern province), Kegalle district (Sabaragamuwa province), Western province",matara,0.02837510196375724
+2011-0024-LKA,2011,1,Flood,"Vavuniya district (Northern province), Central, Eastern, North Central, Sabaragamuwa, Uva provinces; Central, Northern, North Central, Eastern, Uva provinces",vavuniya,0.003922392226360964
+2011-0590-LKA,2011,5,Flood,"Kegalle district (Sabaragamuwa province), Galle district (Southern province), Gampaha, Colombo, Kalutara districts (Western province)",colombo,0.03711930015181524
+2011-0484-LKA,2011,11,Storm,"Sabaragamuwa, Southern, Uva provinces",mean_fallback,0.017933157513447342
+2012-9405-LKA,2012,1,Drought,"Anuradhapura, Polonnaruwa districts (North Central province), Kurunegala, Puttalam districts (North Western province), Moneragala district (Uva province), Hambantota district (Southern province), Mannar district (Northern province)",hambantota,0.04461114412466692
+2012-0425-LKA,2012,10,Storm,"Central, Eastern, North Central, North Western, Northern, Sabaragamuwa, Southern, Uva, Western provinces",mean_fallback,0.01066636308032016
+2012-0537-LKA,2012,12,Flood,"Matale, Kandy, Nuwara Eliya districts (Central province), Batticaloa district (Eastern province), Polonnaruwa, Kurunegala districts (North Central province), Galle, Hambantota districts (Southern province), Badulla, Moneragala districts (Uva province); Central, Eastern, Northern provinces",galle,0.10454350174188483
+2013-0138-LKA,2013,5,mixed,"Central, Eastern, North Central, North Western, Northern, Sabaragamuwa, Southern, Uva, Western provinces; Western, Central, Southern, Sabaragamuwa, North Western provinces",mean_fallback,0.02443196978131675
+2014-9393-LKA,2014,1,Drought,"Mullattivu, Kilinochchi, Mannar, Vavuniya, Jaffna districts (Northern province), Moneragala district (Uva province), Ampara, Batticaloa, Trincomalee districts (Eastern province), Anuradhapura, Polonnaruwa districts (North Central province), Kurunegala, Puttalam districts (North Western province), Hambantota, Galle districts (Southern province)",galle,0.10238877391904172
+2014-0535-LKA,2014,2,Flood,"Central, Eastern, North Central, North Western, Northern, Sabaragamuwa, Southern, Uva, Western provinces",mean_fallback,0.0
+2014-0181-LKA,2014,6,Flood,Western province,mean_fallback,0.021304678484305277
+2014-0402-LKA,2014,10,Mass movement (wet),"Southern province; Haldummulla area (Badulla district, Uva province); Koslanda area (Badulla district, Uva province)",badulla,0.008034432026830822
+2014-0495-LKA,2014,12,Flood,Mullattivu district (Northern province),mean_fallback,0.030115073885670633
+2015-0547-LKA,2015,9,Flood,Southern province,mean_fallback,0.018400776161658347
+2015-0530-LKA,2015,11,Flood,"Trincomalee, Ampara districts (Eastern province), Jaffna, Mullattivu, Kilinochchi districts (Northern province), Puttalam district (North Western province), Gampaha district (Western province), Moneragala district (Uva province)",gampaha,0.027759713116848998
+2016-0153-LKA,2016,5,Flood,"Kilinochchi district (Northern province), Colombo district (Western province), Kegalle district (Sabaragamuwa province)",colombo,0.11483976146076633
+2016-9529-LKA,2016,10,Drought,Batticaloa District (Eastern province),batticaloa,0.017902531089831236
+2017-0153-LKA,2017,5,Flood,"Ratnapura, Matara, Kalutara, Galle, Gampaha, Colombo, Sabaragamuwa, Hambantota",colombo,0.13328986829450154
+2017-0493-LKA,2017,11,mixed,"Telippalai, Pointpedro, Kopay, Maruthankrny, Chenkannai (Jaffna district, Northern province); Galle, Matara (Southern), Colombo, Badulla (Uva), Gampaha, Kalutara (Western), Nuwara Eliya (Central)",colombo,0.12993258788541645
+2018-0278-LKA,2018,5,Flood,"Puttalam,Gampaha, Ratnapura, Colombo, Kurunegala, Kalutara,Kegalle districts",colombo,0.10647157173777717
+2018-0384-LKA,2018,10,Flood,"Kalutara, Galle, Rathnapura, Kegalle districts",galle,0.06750217733807254
+2018-0467-LKA,2018,12,Flood,"Mullaithvu,Kilinochchi, Mannar, Vavuniya, Jaffna districts",jaffna,0.0034993412329535263
+2019-9389-LKA,2019,8,Drought,"North, North-Western, North-Central, Uva and Eastern Provinces",mean_fallback,0.026438137786762638
+2019-0452-LKA,2019,9,Flood,"Galle, Kalutara, Gampaha, Ratnapura, Kegalle, Matara, Colombo",colombo,0.07936070522523701
+2019-0499-LKA,2019,10,Flood,southern and western,mean_fallback,0.010661339758588446
+2019-0577-LKA,2019,11,Flood,"Walapane Village (Nuwara Eliya District, Central Province); Batticaloa District (Eastern Province) ; Uva province; North-west, and East provinces; Mullative, Kilinochchi, Jaffna, Vavuniya (Nothern), Anuradhapura (Noth-Central), Batticaloa (Eastern), Badulla (Uva) districts; Matale, Kandy, Nuwara Eliya, Badulla, Moneragala, Ratnapura, Anuradhapura, Batticaloa, Polonnaruwa, Puttlam, Trincomalee, Vavuniya, Ampara, Kurunegala, Hambantota, Kegalle",kandy,0.06173788870561392
+2020-0211-LKA,2020,5,Storm,"Ratnapura district, Kegalle, Kottampitiya (Kegalle), Pelmadulla (Ratnapura), Polonnaruwa",polonnaruwa,0.004572300689483531
+2020-0461-LKA,2020,9,Flood,"Puttalam, Gampaha districts",gampaha,0.030576746668247126
+2020-0548-LKA,2020,12,Flood,"Mannar, Jaffna, Kilinorchchi, Mullaitivu, Vavuniya, Trincomalee, Kegalle, Rathnapura, Badulla, Kandy, Matal, Puttlam, Anuradhapura, Polonnaruwa; Batticaloa",kandy,0.05327505756602306
+2021-0253-LKA,2021,5,mixed,"Colombo, Gampaha, Kaluthara, Rathnapura, Puttlam, Kegalle, Nuwara Eliya, Galle, Matara, Kurunegala, Kandy; Western, Central and Southern Provinces",colombo,0.09911895003012336
+2021-0714-LKA,2021,10,Flood,"Rathnapura, Nuwara Eliya,Kandy, Jaffna, Badulla, Puttalam Districts; Rambukkana Town (Kurunegala District); Matale District",kandy,0.05683284211530807
+2022-0336-LKA,2022,5,Storm,"Sabaragamuwa, Central provinces; Gampaha and Colombo (Western Province)",colombo,0.0684605507912939
+2022-0490-LKA,2022,8,Flood,"Nuwara Eliya District (southern Central Province); Kandy District (central-western Central Province); Jaffna, Kandy, Matale, Gampaha, Galle, Matara, Hambantota, Kegalle, Rathnapura",galle,0.06696565080001582
+2022-0785-LKA,2022,9,Flood,"Awissawella area of the Colombo district; Kegalle, Kurunegala, Rathnapura, Kandy, Gampaha, Matale, Kalutara, Puttlam, Nuwara Eliya",colombo,0.05597494242530087
+2022-0677-LKA,2022,10,Flood,"Trincomalee (Eastern Province); Kalutara, Gampaha, Colombo district (Western Province); Hambantota and Galle (Southern Province); Killinochchi (Northern Province); Puttalam (North Western Province); Kandy (Central Province); Kegalle and Rathnapura (Sabaragamuwa)",colombo,0.08376554855801195
+2022-0798-LKA,2022,12,Storm,Badulla District (Uva Province),badulla,0.003931196963621936
+2023-0256-LKA,2023,4,Storm,,mean_fallback,0.0054610266976150975
+2023-0436-LKA,2023,7,Storm,,mean_fallback,0.012567308923360245
+2023-0654-LKA,2023,9,Flood,"Western, Southern, Northern, Central, North Western, and Sabaragamuwa Provinces; Kandy and Nuwara-Eliya Districts.",kandy,0.040821566532290486
+2023-0733-LKA,2023,11,Storm,"Kurunegala, Kandy, Anuradhapura, Puttalam, Ratnapura Districts; Kurunegala, Kilinochchi Districts",kandy,0.053316698759164935
+2024-0008-LKA,2024,1,Flood,Ampara and Badulla districts,ampara,0.019481973976159955
+2024-0298-LKA,2024,5,Flood,"Colombo, Gampaha, Kalutara, Matara, Ratnapura, Kegalle, and Galle districts",colombo,0.1291552565218069
+2024-0733-LKA,2024,10,Storm,"Colombo and Gampaha districts; North Western, Sabaragamuwa, Wester",colombo,0.08361567942119243
+2024-0881-LKA,2024,11,Storm,"Ampara, Batticaloa, Trincomalee districts (Eastern province); Mannar, Jana, Kilinochchi, Mullaitivu, Vavuniy districts (Nothern province); Anuradhapura district ( NorthCentral province)",ampara,0.020299612655768403
+2025-0994-LKA,2025,11,mixed,"Ganetenna, Pahala Kadugannawa (Sabaragamuwa province); Badulla, Nuwara Eliya, districts; Puttalam, Badulla, Monaragala, Matale, Colombo, Batticoloa, Kegalle, Trincomalee, Anuradhapura, Mullaitivu, Kilinochchi, Ampara, Jaffna, Polonnaruwa, Kandy, Rathnapura, Kurunegala, Nuwara Eliya, Matara, Hambantota, Galle, Kalutara, Mannar, Gampaha, Vavuniya districts",colombo,0.15750654220522686

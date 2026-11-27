@@ -52,3 +52,45 @@ are fit exclusively on training data (fold-safe).
 | ExpA_LOYO | Leave-one-year-out (hold out all events from one calendar year) |
 | ExpA_ExpandingWindow | Train ≤ Y, test = Y+1, Y ∈ 2012..2022 |
 | ExpB_Chronological | Train ≤ 2018, test ≥ 2019 (N_train=37, N_test=23) |
+
+
+## Survival models (revision 5)
+
+Time and event: t* is the first recovered month (1–12). Recovered events have event = 1 and time = T_rec + 1;
+censored events (no recovery within 12 months) have event = 0 and time = 12.
+Models: penalised Cox proportional hazards (alpha = 0.1), random survival forest (200 trees, min leaf 3),
+and a discrete-time hazard model (logistic regression on person-month rows).
+Metrics: Harrell C-index; integrated Brier score over months 2–9 with the test set administratively censored
+at the training follow-up limit (the censoring distribution cannot be estimated beyond the last training time).
+Experiment A has no censored events, so only the pooled LOOCV C-index is reported there.
+A model that fails is reported with its error in `survival_results.csv`; a run in which every model fails aborts.
+
+## Default-setting analyses
+
+All sensitivity analyses that use "default-setting XGBoost" (threshold/window/persistence grid, confounding variants,
+feature ablation, GDP-lag, baseline-method comparison) call one helper, `src/default_models.py::loocv_default_xgb`
+(library defaults, `random_state=42`, `nthread=1`, fold-safe features). The pipeline asserts that the nominal
+setting gives the same MAE in every analysis.
+
+## Persistence rule
+
+`recovery.persistence_months = p` requires p consecutive months at or above the threshold; T_rec is the month before
+the first month of that run. The sensitivity grid recomputes targets with the same function as the main pipeline,
+so persistence variants change the targets (see `n_changed_vs_main` in `sensitivity_analysis.csv`).
+
+## Confounding
+
+Windows: civil_war_end 2007–2009 and easter_covid_crisis 2019–2022 (config `confounding_windows`); the post-crisis tail
+(`post_crisis_tail_years`, 2023) is flagged as `post_crisis_tail`. `confounding_sensitivity.csv` reports default-setting XGBoost
+and the LOO median baseline for: all events, without civil-war events, without civil-war and tail events, and each flagged group alone.
+
+## Validation schemes
+
+ExpA_LOOCV, ExpA_BufferedLOOCV (12-month buffer), ExpA_LOYO, ExpA_ExpandingWindow, ExpB_Chronological. Naive baselines
+(mean, median, ex-ante last known) are computed for every scheme.
+
+## Statistics quoted in the paper
+
+`src/paper_extras.py` writes `paper_extras.json`: zero shares, censoring by year, Kaplan–Meier curves, event spacing,
+national arrival changes, fold-safe feature ranges for Experiment B, and MAE by regime from the saved predictions.
+`src/make_paper_figures.py` builds Figure 1 from outputs only. `src/make_readme.py` regenerates the README results sections.

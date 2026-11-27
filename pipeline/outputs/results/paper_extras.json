@@ -1,0 +1,387 @@
+{
+  "n_events": 60,
+  "n_zero": 38,
+  "n_censored": 10,
+  "mean_target": 2.9,
+  "expA": {
+    "n": 46,
+    "zero_share": 0.7826,
+    "mean_target": 1.1087,
+    "predict_zero_MAE": 1.1087,
+    "nonzero_by_year": {
+      "2004": 1,
+      "2007": 1,
+      "2008": 4,
+      "2023": 4
+    }
+  },
+  "expB": {
+    "n_train": 37,
+    "n_test": 23,
+    "train_zero_share": 0.8378,
+    "train_mean": 0.9189,
+    "test_mean": 6.087,
+    "test_censored": 10
+  },
+  "crisis_window": {
+    "n": 14,
+    "n_censored": 10,
+    "censored_by_year": {
+      "2019": 0,
+      "2020": 3,
+      "2021": 2,
+      "2022": 5
+    },
+    "n_events_by_year": {
+      "2019": 4,
+      "2020": 3,
+      "2021": 2,
+      "2022": 5
+    },
+    "n_outside": 46,
+    "n_censored_outside": 0
+  },
+  "km_not_recovered_at_12": {
+    "outside_crisis": 0.0,
+    "crisis_window": 0.7143
+  },
+  "km_curves": {
+    "outside_crisis": [
+      [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      [
+        1.0,
+        0.21739130434782605,
+        0.17391304347826086,
+        0.17391304347826086,
+        0.13043478260869565,
+        0.13043478260869565,
+        0.10869565217391304,
+        0.08695652173913043,
+        0.06521739130434782,
+        0.02173913043478261,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "crisis_window": [
+      [
+        0,
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      [
+        1.0,
+        0.8571428571428572,
+        0.7857142857142857,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143,
+        0.7142857142857143
+      ]
+    ]
+  },
+  "event_spacing": {
+    "pairs": 59,
+    "within_12_months": 58,
+    "consecutive_pairs_same_target": 41
+  },
+  "arrivals": {
+    "annual_2018": 2333796,
+    "annual_2021": 194226,
+    "pct_change_2007": -11.7,
+    "pct_change_2008": -11.3,
+    "ratio_2023_to_2018_min": 0.429,
+    "ratio_2023_to_2018_max": 0.831
+  },
+  "expB_feature_diagnostics_foldsafe": {
+    "DSI": {
+      "train_min": -1.9335,
+      "train_max": 1.6066,
+      "test_min": -1.4533,
+      "test_max": 0.9225,
+      "share_test_outside_train_range": 0.0
+    },
+    "TWDI": {
+      "train_min": 0.0,
+      "train_max": 0.195,
+      "test_min": 0.0039,
+      "test_max": 0.1573,
+      "share_test_outside_train_range": 0.0
+    },
+    "Season_sin": {
+      "train_min": -1.0,
+      "train_max": 1.0,
+      "test_min": -1.0,
+      "test_max": 0.866,
+      "share_test_outside_train_range": 0.0
+    },
+    "Season_cos": {
+      "train_min": -1.0,
+      "train_max": 1.0,
+      "test_min": -0.866,
+      "test_max": 1.0,
+      "share_test_outside_train_range": 0.0
+    },
+    "global_tourism_idx": {
+      "train_min": 97.2,
+      "train_max": 178.2,
+      "test_min": 72.0,
+      "test_max": 180.0,
+      "share_test_outside_train_range": 0.3913
+    },
+    "gdp_growth": {
+      "train_min": 3.3,
+      "train_max": 9.1,
+      "test_min": -7.8,
+      "test_max": 4.8,
+      "share_test_outside_train_range": 0.6957
+    },
+    "Economic_Condition_Index": {
+      "train_min": -0.9252,
+      "train_max": 0.7887,
+      "test_min": -8.8662,
+      "test_max": -1.3952,
+      "share_test_outside_train_range": 1.0
+    },
+    "external_shock_flag": {
+      "train_min": 0.0,
+      "train_max": 0.0,
+      "test_min": 0.0,
+      "test_max": 1.0,
+      "share_test_outside_train_range": 0.6087
+    }
+  },
+  "corr_global_index_year_train": 0.9757,
+  "corr_eci_gdp_train_foldsafe": 0.7915,
+  "mae_by_regime": {
+    "ExpA_LOOCV": {
+      "baseline": {
+        "NaiveLastKnown": {
+          "MAE": 0.2692,
+          "n": 28
+        },
+        "NaiveMean": {
+          "MAE": 1.1619,
+          "n": 28
+        },
+        "NaiveMedian": {
+          "MAE": 0.1071,
+          "n": 28
+        },
+        "NaivePrevious_Oracle": {
+          "MAE": 0.2548,
+          "n": 28
+        },
+        "RandomForest": {
+          "MAE": 0.622,
+          "n": 28
+        },
+        "Ridge": {
+          "MAE": 0.8919,
+          "n": 28
+        },
+        "SVR": {
+          "MAE": 0.1262,
+          "n": 28
+        },
+        "TwoStage": {
+          "MAE": 0.5074,
+          "n": 28
+        },
+        "XGBoost": {
+          "MAE": 0.6228,
+          "n": 28
+        }
+      },
+      "confounded_civil_war": {
+        "NaiveLastKnown": {
+          "MAE": 4.7778,
+          "n": 9
+        },
+        "NaiveMean": {
+          "MAE": 3.4198,
+          "n": 9
+        },
+        "NaiveMedian": {
+          "MAE": 3.4444,
+          "n": 9
+        },
+        "NaivePrevious_Oracle": {
+          "MAE": 3.3333,
+          "n": 9
+        },
+        "RandomForest": {
+          "MAE": 2.5369,
+          "n": 9
+        },
+        "Ridge": {
+          "MAE": 3.1149,
+          "n": 9
+        },
+        "SVR": {
+          "MAE": 3.4538,
+          "n": 9
+        },
+        "TwoStage": {
+          "MAE": 1.1072,
+          "n": 9
+        },
+        "XGBoost": {
+          "MAE": 2.3532,
+          "n": 9
+        }
+      },
+      "post_crisis_recovery": {
+        "NaiveLastKnown": {
+          "MAE": 3.2222,
+          "n": 9
+        },
+        "NaiveMean": {
+          "MAE": 2.0815,
+          "n": 9
+        },
+        "NaiveMedian": {
+          "MAE": 1.8889,
+          "n": 9
+        },
+        "NaivePrevious_Oracle": {
+          "MAE": 1.7778,
+          "n": 9
+        },
+        "RandomForest": {
+          "MAE": 0.9439,
+          "n": 9
+        },
+        "Ridge": {
+          "MAE": 1.7381,
+          "n": 9
+        },
+        "SVR": {
+          "MAE": 1.9887,
+          "n": 9
+        },
+        "TwoStage": {
+          "MAE": 1.1612,
+          "n": 9
+        },
+        "XGBoost": {
+          "MAE": 1.1343,
+          "n": 9
+        }
+      }
+    },
+    "ExpB_Chronological": {
+      "easter_covid_crisis": {
+        "NaiveLastKnown": {
+          "MAE": 8.7857,
+          "n": 14
+        },
+        "NaiveMean": {
+          "MAE": 8.1293,
+          "n": 14
+        },
+        "NaiveMedian": {
+          "MAE": 8.7857,
+          "n": 14
+        },
+        "NaivePrevious_Oracle": {
+          "MAE": 8.7857,
+          "n": 14
+        },
+        "RandomForest": {
+          "MAE": 7.4049,
+          "n": 14
+        },
+        "Ridge": {
+          "MAE": 6.7228,
+          "n": 14
+        },
+        "SVR": {
+          "MAE": 8.7656,
+          "n": 14
+        },
+        "TwoStage": {
+          "MAE": 3.1718,
+          "n": 14
+        },
+        "XGBoost": {
+          "MAE": 8.0803,
+          "n": 14
+        }
+      },
+      "post_crisis_recovery": {
+        "NaiveLastKnown": {
+          "MAE": 1.8889,
+          "n": 9
+        },
+        "NaiveMean": {
+          "MAE": 1.991,
+          "n": 9
+        },
+        "NaiveMedian": {
+          "MAE": 1.8889,
+          "n": 9
+        },
+        "NaivePrevious_Oracle": {
+          "MAE": 1.8889,
+          "n": 9
+        },
+        "RandomForest": {
+          "MAE": 1.6356,
+          "n": 9
+        },
+        "Ridge": {
+          "MAE": 2.0224,
+          "n": 9
+        },
+        "SVR": {
+          "MAE": 1.8922,
+          "n": 9
+        },
+        "TwoStage": {
+          "MAE": 4.0203,
+          "n": 9
+        },
+        "XGBoost": {
+          "MAE": 1.7777,
+          "n": 9
+        }
+      }
+    }
+  }
+}
